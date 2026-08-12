@@ -3,3 +3,7 @@ dist/
 .superpowers/
 *.pyc
 __pycache__/
+.DS_Store
+.claude/
+CLAUDE.md
+.gitignore

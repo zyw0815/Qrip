@@ -353,26 +353,15 @@ Qobuz does not provide lyrics via streamrip. Only Tidal fetches and tags lyrics 
 ## 10. Git Workflow
 
 ```
-main ──────────────────────────●──●── (releases only)
-  │                             │
-develop ──────●────●────●───────●── (integration)
-  │            │    │    │
-  ├─ feat/login
-  ├─ feat/search
-  ├─ feat/downloads
-  └─ feat/settings
+main ──────────────────────●──●── (releases only)
+  │                         │
+develop ────●────●────●─────●── (all development)
 ```
 
 - **`main`**: Stable releases. Only merged from `develop` when cutting a release.
-- **`develop`**: Integration branch. All feature branches merge here.
-- **Feature branches**: `feat/<name>`, branched from `develop`, merged back via PR.
-- **Issues**: Each feature/bug has a GitHub Issue. Branch named after issue.
+- **`develop`**: All development happens here directly. No feature branches.
+- **Issues**: Each feature/bug has a GitHub Issue. Commits reference the issue.
 - **No `main` → `develop` back-merges** except during release.
-
-### Branch Protection (set in GitHub)
-
-- `main`: Require PR review before merge
-- `develop`: Require PR review before merge (optional for solo dev)
 
 ---
 
