@@ -1,0 +1,41 @@
+{
+  "name": "qrip",
+  "version": "0.1.0",
+  "description": "Desktop GUI for downloading music from Qobuz",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "vite build && electron-builder"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "lucide-react": "^0.400.0",
+    "electron-store": "^8.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "concurrently": "^8.2.2",
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.qrip.app",
+    "productName": "Qrip",
+    "mac": { "target": "dmg" },
+    "win": { "target": "nsis" },
+    "files": ["dist/**/*", "dist-electron/**/*", "python/**/*"],
+    "extraResources": [{ "from": "python/", "to": "python/" }]
+  }
+}
