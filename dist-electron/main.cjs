@@ -101,6 +101,14 @@ electron_1.ipcMain.handle('store:delete', (_e, key) => {
     return true;
 });
 electron_1.ipcMain.handle('get-download-path', () => electron_1.app.getPath('music'));
+electron_1.ipcMain.handle('dialog:pick-folder', async () => {
+    const result = await electron_1.dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory', 'createDirectory'],
+        title: 'Select download folder',
+        defaultPath: electron_1.app.getPath('music'),
+    });
+    return result.canceled ? null : result.filePaths[0];
+});
 electron_1.app.whenReady().then(() => {
     startPython();
     createWindow();
