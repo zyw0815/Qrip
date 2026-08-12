@@ -204,27 +204,32 @@ export default function SearchTab() {
   )
 }
 
-function formatResult(data: Record<string, any>): Result {
-  const d = data.data || data
+function formatResult(item: Record<string, any>): Result {
+  const d = item
   const meta: string[] = []
   if (d.year) meta.push(String(d.year))
   if (d.tracks_count) meta.push(`${d.tracks_count} tracks`)
-  if (d.duration) meta.push(String(d.duration))
-  if (d.label?.name) meta.push(d.label.name)
-  else if (d.label) meta.push(String(d.label))
+  if (d.duration) {
+    const mins = Math.floor(Number(d.duration) / 60)
+    const secs = Number(d.duration) % 60
+    meta.push(`${mins}:${String(secs).padStart(2, '0')}`)
+  }
+  if (d.label) meta.push(String(d.label))
 
   const qualityTags: string[] = []
   if (d.bit_depth) qualityTags.push(`FLAC ${d.bit_depth}-bit`)
-  if (d.sampling_rate) qualityTags.push(`${(Number(d.sampling_rate) / 1000).toFixed(d.sampling_rate % 1000 === 0 ? 0 : 1)} kHz`)
-  if (d.maximum_bit_depth) qualityTags.push(`FLAC ${d.maximum_bit_depth}-bit`)
+  if (d.sampling_rate) {
+    const sr = Number(d.sampling_rate)
+    qualityTags.push(sr >= 1000 ? `${sr / 1000} kHz` : `${sr} Hz`)
+  }
 
   return {
     id: d.id || '',
-    type: data.type || 'album',
+    type: d.type || item.type || 'album',
     title: d.title || d.name || 'Unknown',
-    artist: d.artist?.name || d.artist || d.authors || '',
+    artist: d.artist || '',
     meta,
     qualityTags,
-    cover: d.image?.large || d.image?.small || d.images?.[0] || undefined,
+    cover: d.cover || undefined,
   }
 }
