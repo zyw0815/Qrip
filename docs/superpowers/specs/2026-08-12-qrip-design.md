@@ -31,13 +31,13 @@ It wraps the [streamrip](https://github.com/nathom/streamrip) Python core with a
 | Audio Core | streamrip (Python) | Imported directly — no CLI subprocess calls |
 | Auth | Electron BrowserWindow (OAuth) | In-app browser window for Google → Qobuz login flow |
 | Storage | electron-store (JSON) + SQLite | App preferences in JSON, download history via streamrip's existing SQLite DB |
-| Build | electron-builder | Cross-platform packaging (macOS target for V1) |
+| Build | electron-builder | Cross-platform packaging — macOS + Windows |
 
 ### 2.2 Why Electron over Tauri
 
 - User chose Electron for faster development and mature ecosystem
 - Node.js `child_process.spawn` makes Python communication trivial
-- V1 targets macOS; cross-platform packaging available later
+- V1 targets macOS + Windows — electron-builder handles both
 
 ### 2.3 Why React
 
@@ -399,7 +399,7 @@ The Account settings section already has an "Add another account" placeholder. T
 | Multi-account | V2 — architecture supports it, UI placeholder exists |
 | Download scheduling | Future — not in streamrip core |
 | Custom theme colors | Future — CSS variables make this straightforward |
-| Windows/Linux builds | Future — electron-builder supports all platforms |
+| Windows/Linux builds | Already in V1 — electron-builder supports both macOS and Windows |
 
 ---
 
