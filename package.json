@@ -34,9 +34,22 @@
   "build": {
     "appId": "com.qrip.app",
     "productName": "Qrip",
-    "mac": { "target": "dmg" },
-    "win": { "target": "nsis" },
-    "files": ["dist/**/*", "dist-electron/**/*", "python/**/*"],
-    "extraResources": [{ "from": "python/", "to": "python/" }]
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "python/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "python/",
+        "to": "python/"
+      }
+    ]
   }
 }
