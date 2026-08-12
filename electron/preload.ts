@@ -8,4 +8,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPythonStatus: (cb: (status: string) => void) =>
     ipcRenderer.on('python-status', (_e, status) => cb(status)),
   getDownloadPath: () => ipcRenderer.invoke('get-download-path'),
+  pickFolder: () => ipcRenderer.invoke('dialog:pick-folder'),
 })

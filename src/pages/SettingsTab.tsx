@@ -138,7 +138,14 @@ export default function SettingsTab() {
             <input value={folder} onChange={(e) => { setFolder(e.target.value); update('download_folder', e.target.value) }}
               className="flex-1 h-9 bg-bg-input border border-border rounded-lg px-2.5 text-[11px] text-text-secondary font-mono outline-none focus:border-purple"
             />
-            <button className="w-9 h-9 bg-bg-input border border-border rounded-lg flex items-center justify-center text-sm hover:border-text-muted transition flex-shrink-0">📂</button>
+            <button
+              onClick={async () => {
+                if (window.electronAPI?.pickFolder) {
+                  const path = await window.electronAPI.pickFolder()
+                  if (path) { setFolder(path); update('download_folder', path) }
+                }
+              }}
+              className="w-9 h-9 bg-bg-input border border-border rounded-lg flex items-center justify-center text-sm hover:border-text-muted transition flex-shrink-0">📂</button>
           </div>
         </div>
 

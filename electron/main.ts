@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'
 import path from 'path'
 import Store from 'electron-store'
@@ -107,6 +107,15 @@ ipcMain.handle('store:delete', (_e, key: string) => {
   return true
 })
 ipcMain.handle('get-download-path', () => app.getPath('music'))
+
+ipcMain.handle('dialog:pick-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openDirectory', 'createDirectory'],
+    title: 'Select download folder',
+    defaultPath: app.getPath('music'),
+  })
+  return result.canceled ? null : result.filePaths[0]
+})
 
 app.whenReady().then(() => {
   startPython()
