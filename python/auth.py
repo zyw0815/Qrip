@@ -12,6 +12,9 @@ router = APIRouter()
 _config: Config | None = None
 _logged_in = False
 
+# Dev mode: skip login for browser development
+_DEV_MODE = os.environ.get("QRIP_DEV", "1") == "1"
+
 
 class EmailLoginRequest(BaseModel):
     email: str
@@ -31,6 +34,8 @@ def get_config() -> Config:
 
 @router.get("/status")
 async def auth_status():
+    if _DEV_MODE:
+        return {"authenticated": True}
     return {"authenticated": _logged_in}
 
 
