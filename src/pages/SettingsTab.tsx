@@ -127,7 +127,7 @@ export default function SettingsTab() {
   const currentQuality = QUALITY_TIERS[qualityIdx]?.label || QUALITY_TIERS[3].label
 
   return (
-    <div className="p-5 animate-fade-in">
+    <div className="p-5 animate-fade-in h-full">
       {/* DOWNLOAD */}
       <section className="mb-7">
         <h2 className={sectionTitle}>Download</h2>
