@@ -12,8 +12,8 @@ router = APIRouter()
 _config: Config | None = None
 _logged_in = False
 
-# Dev mode: skip login for browser development
-_DEV_MODE = os.environ.get("QRIP_DEV", "1") == "1"
+# Dev mode: skip login for browser development. Set QRIP_DEV=0 to require real auth.
+_DEV_MODE = os.environ.get("QRIP_DEV", "0") == "1"
 
 
 class EmailLoginRequest(BaseModel):
