@@ -81,7 +81,7 @@ export default function SearchTab() {
   }
 
   return (
-    <div className="p-5 animate-fade-in">
+    <div className="p-5 animate-fade-in h-full">
       {/* Mode Switcher */}
       <div className="flex gap-2 mb-5">
         {(['url', 'search'] as Mode[]).map((m) => (

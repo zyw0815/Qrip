@@ -19,10 +19,10 @@ export default function MainLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-deep flex flex-col" style={bgStyle}>
+    <div className="h-screen bg-bg-deep flex flex-col overflow-hidden" style={bgStyle}>
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-5 pb-2">
-        <h1 className="text-[15px] font-bold tracking-[-0.3px] bg-gradient-to-r from-purple-light to-purple bg-clip-text text-transparent select-none">
+      <div className="flex items-center justify-between px-5 pt-5 pb-2 flex-shrink-0">
+        <h1 className="text-2xl font-bold tracking-[-0.3px] bg-gradient-to-r from-purple-light to-purple bg-clip-text text-transparent select-none">
           Qrip
         </h1>
         <TabBar tabs={TABS} active={activeTab} onChange={setActiveTab} />

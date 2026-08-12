@@ -2,8 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
+html, body, #root {
   margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
   background: #08080f;
   color: #f0edf5;
   font-family: 'DM Sans', system-ui, sans-serif;

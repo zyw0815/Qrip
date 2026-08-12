@@ -41,7 +41,7 @@ export default function DownloadsTab() {
 
   if (downloading.length === 0 && queued.length === 0) {
     return (
-      <div className="p-5 animate-fade-in">
+      <div className="p-5 animate-fade-in h-full">
         <div className="text-center py-24">
           <p className="text-5xl mb-5 opacity-40">⬇</p>
           <p className="text-text-muted text-sm font-medium">No downloads yet</p>
@@ -54,7 +54,7 @@ export default function DownloadsTab() {
   }
 
   return (
-    <div className="p-5 animate-fade-in">
+    <div className="p-5 animate-fade-in h-full">
       {/* Active downloads */}
       {downloading.length > 0 && (
         <>
