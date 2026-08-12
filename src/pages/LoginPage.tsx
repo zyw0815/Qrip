@@ -4,7 +4,7 @@ import { API_BASE } from '../App'
 type LoginMethod = 'google' | 'email' | 'token'
 
 export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void }) {
-  const [method, setMethod] = useState<LoginMethod>('email')
+  const [method, setMethod] = useState<LoginMethod>('google')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [token, setToken] = useState('')
