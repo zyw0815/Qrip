@@ -29,7 +29,7 @@ export default function MainLayout() {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" key={activeTab}>
         {activeTab === 'search' && <SearchTab />}
         {activeTab === 'downloads' && <DownloadsTab />}
         {activeTab === 'settings' && <SettingsTab />}
