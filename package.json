@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Desktop GUI for downloading music from Qobuz",
   "main": "dist-electron/main.js",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -11,10 +12,10 @@
     "electron:build": "vite build && electron-builder"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "electron-store": "^8.2.0",
     "lucide-react": "^0.400.0",
-    "electron-store": "^8.2.0"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
