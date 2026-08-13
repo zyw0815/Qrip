@@ -23,16 +23,20 @@ function interceptQobuzAuth(session: Electron.Session, onCaptured: (token: strin
 }
 
 function startPython() {
-  const pythonPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'python', 'venv', 'bin', 'python3')
-    : '/opt/anaconda3/envs/music/bin/python3'
-  const scriptPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'python', 'server.py')
-    : path.join(__dirname, '..', 'python', 'server.py')
-
-  pythonProcess = spawn(pythonPath, [scriptPath], {
-    env: { ...process.env, PYTHONUNBUFFERED: '1' },
-  })
+  if (app.isPackaged) {
+    // Packaged: spawn the PyInstaller-built standalone backend binary.
+    const binaryName = process.platform === 'win32' ? 'qrip-server.exe' : 'qrip-server'
+    pythonProcess = spawn(path.join(process.resourcesPath, 'backend', binaryName), [], {
+      env: { ...process.env, PYTHONUNBUFFERED: '1' },
+    })
+  } else {
+    // Dev: use the conda env python directly.
+    pythonProcess = spawn(
+      '/opt/anaconda3/envs/music/bin/python3',
+      [path.join(__dirname, '..', 'python', 'server.py')],
+      { env: { ...process.env, PYTHONUNBUFFERED: '1' } },
+    )
+  }
 
   pythonProcess.stdout?.on('data', (data) => {
     const msg = data.toString()

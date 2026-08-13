@@ -7,3 +7,6 @@ __pycache__/
 .claude/
 CLAUDE.md
 .gitignore
+python/dist/
+python/build/
+*.spec

@@ -1,0 +1,24 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+
+# streamrip runtime deps (from streamrip's pyproject.toml, Linux/CI subset)
+mutagen
+tomlkit
+pathvalidate
+Pillow>=9,<11
+deezer-py==1.3.6
+pycryptodomex
+appdirs
+m3u8
+aiofiles
+aiohttp
+aiodns
+aiolimiter
+rich
+click-help-colors
+requests
+
+# Qrip backend-only deps (excluded from pip deps to avoid version pins)
+# (none)

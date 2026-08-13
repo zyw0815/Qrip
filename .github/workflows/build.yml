@@ -1,0 +1,90 @@
+name: Build Installers
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, develop]
+    tags: ['v*']
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: pip install -r python/requirements-build.txt pyinstaller
+
+      - name: Build backend binary (PyInstaller)
+        working-directory: python
+        run: |
+          pyinstaller --onefile --name qrip-server \
+            --add-data "../streamrip/config.toml:streamrip" \
+            --paths . --paths .. server.py
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Electron app (macOS dmg)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run build:electron && npx vite build && npx electron-builder --mac dmg
+
+      - name: Upload dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qrip-macos
+          path: |
+            dist/*.dmg
+            dist/*.zip
+          if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: pip install -r python/requirements-build.txt pyinstaller
+
+      - name: Build backend binary (PyInstaller)
+        working-directory: python
+        run: |
+          pyinstaller --onefile --name qrip-server `
+            --add-data "../streamrip/config.toml;streamrip" `
+            --paths . --paths .. server.py
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Electron app (Windows nsis)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run build:electron && npx vite build && npx electron-builder --win nsis
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qrip-windows
+          path: dist/*.exe
+          if-no-files-found: error
