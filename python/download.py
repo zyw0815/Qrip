@@ -15,7 +15,7 @@ from streamrip.media.album import PendingAlbum
 from streamrip.media.track import PendingSingle
 from streamrip.media.playlist import PendingPlaylist
 from streamrip.media.artwork import remove_artwork_tempdirs
-from streamrip.db import Database, Downloads, Failed
+from streamrip.db import Database, Dummy
 from auth import get_config
 
 router = APIRouter()
@@ -30,13 +30,10 @@ _db: Optional[Database] = None
 
 
 def get_db() -> Database:
+    """No-op database — everything is always downloadable, existing files overwrite."""
     global _db
     if _db is None:
-        cfg = get_config()
-        dp = cfg.session.database.downloads_path or os.path.expanduser("~/.config/streamrip/downloads.db")
-        fp = cfg.session.database.failed_downloads_path or os.path.expanduser("~/.config/streamrip/failed_downloads.db")
-        os.makedirs(os.path.dirname(dp), exist_ok=True)
-        _db = Database(downloads=Downloads(dp), failed=Failed(fp))
+        _db = Database(downloads=Dummy(), failed=Dummy())
     return _db
 
 
