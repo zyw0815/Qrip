@@ -70,8 +70,11 @@ def get_config() -> Config:
     if _config is None:
         _config = Config.defaults()
         # Qrip's own defaults (overriding streamrip's blank template values)
+        # Note: stored with streamrip's native format keys
+        #   folder: {albumartist} = artist, {title} = album name
+        #   file:   {artist}, {title}, {tracknumber}
         s = _config.session
-        s.filepaths.folder_format = "{artist} — {album} ({year})"
+        s.filepaths.folder_format = "{albumartist} — {title} ({year})"
         s.filepaths.track_format = "{artist} — {title}"
         s.artwork.save_artwork = False
         if not s.downloads.folder:
