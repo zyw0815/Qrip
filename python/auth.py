@@ -20,11 +20,6 @@ _DEV_MODE = os.environ.get("QRIP_DEV", "0") == "1"
 _QRIP_CONFIG_PATH = os.path.join(click.get_app_dir("Qrip"), "credentials.toml")
 
 
-class EmailLoginRequest(BaseModel):
-    email: str
-    password: str
-
-
 class TokenLoginRequest(BaseModel):
     token: str
 
@@ -91,26 +86,6 @@ async def auth_status():
     if _DEV_MODE:
         return {"authenticated": True}
     return {"authenticated": _logged_in}
-
-
-@router.post("/login/email")
-async def login_email(req: EmailLoginRequest):
-    global _logged_in
-    cfg = get_config()
-    cfg.session.qobuz.email_or_userid = req.email
-    cfg.session.qobuz.password_or_token = req.password
-    cfg.session.qobuz.use_auth_token = False
-
-    from streamrip.client.qobuz import QobuzClient
-
-    client = QobuzClient(cfg)
-    try:
-        await client.login()
-    except Exception as e:
-        raise HTTPException(401, str(e))
-    _save_credentials(cfg)
-    _logged_in = True
-    return {"status": "ok"}
 
 
 @router.post("/login/token")

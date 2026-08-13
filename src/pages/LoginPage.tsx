@@ -1,30 +1,26 @@
 import { useState } from 'react'
 import { API_BASE } from '../App'
 
-type LoginMethod = 'google' | 'email' | 'token'
-
 export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void }) {
-  const [method, setMethod] = useState<LoginMethod>('google')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [token, setToken] = useState('')
+  const [showToken, setShowToken] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const isElectron = typeof window !== 'undefined' && !!window.electronAPI
 
-  const handleGoogleLogin = async () => {
+  const handlePopupLogin = async () => {
     if (!isElectron) {
-      setError('Google login requires the desktop app. Use Email or Token in browser.')
+      setError('Popup login requires the desktop app. Use Token login instead.')
       return
     }
+    setLoading(true)
+    setError('')
     try {
       const captured = await window.electronAPI?.openOAuth(
-        'https://play.qobuz.com/login?open-oauth=google',
+        'https://play.qobuz.com/login',
       )
       if (captured) {
-        setLoading(true)
-        setError('')
         let userId = ''
         let token = ''
         try {
@@ -50,27 +46,6 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
       }
     } catch {
       setError('OAuth flow failed')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleEmailLogin = async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const r = await fetch(`${API_BASE}/auth/login/email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-      if (r.ok) onAuthSuccess()
-      else {
-        const data = await r.json()
-        setError(data.detail || 'Login failed')
-      }
-    } catch {
-      setError('Connection failed. Is the backend running?')
     } finally {
       setLoading(false)
     }
@@ -104,103 +79,56 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
 
   return (
     <div className="min-h-screen flex items-center justify-center p-8" style={bgStyle}>
-      <div className="w-full max-w-[380px] text-center animate-fade-in">
-        <h1 className="text-[32px] font-extrabold tracking-[-0.5px] bg-gradient-to-r from-purple-light to-purple bg-clip-text text-transparent mb-1">
+      <div className="w-full max-w-[400px] text-center animate-fade-in">
+        <h1 className="text-[36px] font-extrabold tracking-[-0.5px] bg-gradient-to-r from-purple-light to-purple bg-clip-text text-transparent mb-1">
           Qrip
         </h1>
-        <p className="text-base text-text-muted mb-7">Sign in to start downloading</p>
+        <p className="text-base text-text-muted mb-8">Sign in to start downloading</p>
 
-        {/* Method tabs */}
-        <div className="flex border-b border-border mb-5">
-          {(
-            [
-              ['google', 'Google'],
-              ['email', 'Email'],
-              ['token', 'Token'],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => { setMethod(key); setError('') }}
-              className={`flex-1 text-center py-2.5 text-base font-medium border-b-2 transition-colors ${
-                method === key
-                  ? 'text-purple-light border-purple'
-                  : 'text-text-muted border-transparent hover:text-text-secondary'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        {/* Primary: popup login */}
+        <button
+          onClick={handlePopupLogin}
+          disabled={loading}
+          className="w-full h-[52px] bg-purple text-white rounded-xl text-lg font-semibold flex items-center justify-center gap-2.5 hover:bg-[#6d28d9] transition disabled:opacity-50 shadow-[0_4px_20px_rgba(124,58,237,0.35)]"
+        >
+          <span className="text-xl">🎵</span>
+          {loading ? 'Opening...' : '登录 Qobuz'}
+        </button>
+        <p className="text-sm text-text-muted mt-3">
+          {isElectron
+            ? '弹出 Qobuz 登录窗口，登录后自动完成认证'
+            : '弹窗登录仅在桌面 App 中可用，请使用下方 Token 登录'}
+        </p>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 my-7">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-sm text-text-muted">或</span>
+          <div className="flex-1 h-px bg-border" />
         </div>
 
-        {/* Google */}
-        {method === 'google' && (
-          <div className="animate-fade-in">
-            <button
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              className="w-full h-11 bg-[#4285f4] text-white rounded-lg text-lg font-medium flex items-center justify-center gap-2 hover:brightness-110 transition disabled:opacity-50"
-            >
-              <span className="bg-white text-[#4285f4] w-5 h-5 rounded-full text-base font-bold leading-5">
-                G
-              </span>
-              Sign in with Google
-            </button>
-            {!isElectron && (
-              <p className="text-[13px] text-yellow-500/70 mt-2">
-                Google login is only available in the desktop app
-              </p>
-            )}
-            {isElectron && (
-              <p className="text-[13px] text-text-muted mt-2.5">
-                Opens a secure browser for Google authentication
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Email */}
-        {method === 'email' && (
-          <div className="flex flex-col gap-2.5 animate-fade-in">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email address"
-              className="w-full h-[46px] bg-bg-input border border-border rounded-lg px-3 text-lg text-text-primary placeholder:text-text-muted outline-none focus:border-purple transition"
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              className="w-full h-[46px] bg-bg-input border border-border rounded-lg px-3 text-lg text-text-primary placeholder:text-text-muted outline-none focus:border-purple transition"
-            />
-            <button
-              onClick={handleEmailLogin}
-              disabled={loading || !email || !password}
-              className="w-full h-[46px] bg-purple text-white rounded-lg text-lg font-medium hover:bg-[#6d28d9] transition disabled:opacity-50"
-            >
-              {loading ? 'Signing in...' : 'Sign in with Email'}
-            </button>
-          </div>
-        )}
-
-        {/* Token */}
-        {method === 'token' && (
-          <div className="flex flex-col gap-2.5 animate-fade-in">
+        {/* Secondary: token login */}
+        {!showToken ? (
+          <button
+            onClick={() => setShowToken(true)}
+            className="text-sm text-text-secondary hover:text-purple-light transition"
+          >
+            使用 Token 登录 ▾
+          </button>
+        ) : (
+          <div className="flex flex-col gap-3 animate-fade-in text-left">
             <textarea
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              placeholder="Paste your Qobuz auth token..."
-              className="w-full h-20 bg-bg-input border border-border rounded-lg px-3 py-2.5 text-lg text-text-primary placeholder:text-text-muted outline-none focus:border-purple transition resize-none"
+              placeholder="粘贴你的 Qobuz auth token..."
+              className="w-full h-24 bg-bg-input border border-border rounded-lg px-3 py-2.5 text-base text-text-primary placeholder:text-text-muted outline-none focus:border-purple transition resize-none"
             />
             <button
               onClick={handleTokenLogin}
               disabled={loading || !token.trim()}
-              className="w-full h-[46px] bg-purple text-white rounded-lg text-lg font-medium hover:bg-[#6d28d9] transition disabled:opacity-50"
+              className="w-full h-[46px] bg-bg-input border border-border text-text-primary rounded-lg text-base font-medium hover:border-purple hover:text-purple-light transition disabled:opacity-50"
             >
-              {loading ? 'Authenticating...' : 'Authenticate with Token'}
+              {loading ? 'Authenticating...' : 'Token 认证'}
             </button>
           </div>
         )}
