@@ -34,11 +34,21 @@ def item_to_dict(item: dict, media_type: str) -> dict:
         title = (item.get("title") or "").strip()
         version = (item.get("version") or "").strip()
         result["title"] = title + (" (" + version + ")" if version else "")
-        result["artist"] = item.get("artist", {}).get("name") or item.get("performer", {}).get("name") or "Unknown"
-        result["year"] = item.get("release_date_original") or item.get("release_date") or ""
-        result["tracks_count"] = item.get("tracks_count", 0)
+        artist_obj = item.get("artist") or {}
+        if isinstance(artist_obj, str):
+            artist_name = artist_obj
+        else:
+            artist_name = artist_obj.get("name") or ""
+        result["artist"] = artist_name or (item.get("performer", {}) or {}).get("name") or "Unknown"
+        released = item.get("released_at") or item.get("release_date_original") or item.get("release_date") or ""
+        if isinstance(released, (int, float)):
+            import datetime
+            released = datetime.datetime.fromtimestamp(released).strftime("%Y-%m-%d")
+        result["year"] = str(released)[:10]
+        result["tracks_count"] = item.get("media_count") or item.get("tracks_count") or 0
         result["duration"] = item.get("duration", 0)
-        result["label"] = (item.get("label", {}) or {}).get("name", "")
+        label_obj = item.get("label") or {}
+        result["label"] = label_obj.get("name", "") if isinstance(label_obj, dict) else str(label_obj or "")
         image = item.get("image", {}) or {}
         result["cover"] = image.get("large") or image.get("small") or ""
         result["bit_depth"] = item.get("maximum_bit_depth")
