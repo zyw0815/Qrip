@@ -24,12 +24,15 @@ export default function SearchTab() {
   const [searchResults, setSearchResults] = useState<Result[]>([])
   const [filter, setFilter] = useState<FilterType>('all')
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [total, setTotal] = useState(0)
   const [error, setError] = useState('')
 
   const input = mode === 'url' ? urlInput : searchInput
   const results = mode === 'url' ? urlResults : searchResults
   const setInput = mode === 'url' ? setUrlInput : setSearchInput
   const setResults = mode === 'url' ? setUrlResults : setSearchResults
+  const hasMore = mode === 'search' && results.length < total
 
   const handleResolve = async () => {
     if (!input.trim()) return
@@ -73,10 +76,37 @@ export default function SearchTab() {
       }
       const data = await r.json()
       setResults((data.results || []).map(formatResult))
+      setTotal(data.total || 0)
     } catch {
       setError('Backend connection failed')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadMore = async () => {
+    if (!input.trim() || loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const mediaType = filter === 'all' ? 'album' : filter
+      const r = await fetch(`${API_BASE}/search/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: input.trim(),
+          media_type: mediaType,
+          offset: results.length,
+        }),
+      })
+      if (r.ok) {
+        const data = await r.json()
+        setResults((prev) => [...prev, ...(data.results || []).map(formatResult)])
+        setTotal(data.total || 0)
+      }
+    } catch {
+      setError('Backend connection failed')
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -248,6 +278,19 @@ export default function SearchTab() {
           />
         ))}
       </div>
+
+      {/* Load more */}
+      {mode === 'search' && hasMore && (
+        <div className="text-center mt-4">
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="h-10 px-8 bg-bg-input border border-border text-text-secondary rounded-lg text-base font-medium hover:border-purple hover:text-purple-light transition disabled:opacity-50"
+          >
+            {loadingMore ? 'Loading...' : `Load more (${total - results.length} left) ▾`}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

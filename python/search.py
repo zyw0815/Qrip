@@ -18,10 +18,14 @@ router = APIRouter()
 class SearchRequest(BaseModel):
     query: str
     media_type: str = "album"
+    offset: int = 0
 
 
 class ResolveRequest(BaseModel):
     url: str
+
+
+PAGE_SIZE = 20
 
 
 def item_to_dict(item: dict, media_type: str) -> dict:
@@ -80,18 +84,26 @@ async def search(req: SearchRequest):
     cfg = get_config()
     client = QobuzClient(cfg)
     await client.login()
-    resp = await client.search(req.media_type, req.query, limit=20)
+    resp = await client.search(req.media_type, req.query, limit=req.offset + PAGE_SIZE)
 
     # client.search() returns a list of PAGE dicts, each shaped like
     # {"albums": {"items": [...], "total": N, ...}}
     key = req.media_type + "s"
     items = []
+    total = 0
     if isinstance(resp, list):
         for page in resp:
             if isinstance(page, dict):
                 items.extend(page.get(key, {}).get("items", []))
+        if resp and isinstance(resp[0], dict):
+            total = resp[0].get(key, {}).get("total", 0)
     elif isinstance(resp, dict):
         items = resp.get(key, {}).get("items", [])
+        total = resp.get(key, {}).get("total", 0)
+
+    # _paginate(limit=offset+PAGE_SIZE) returns a flat list of ALL items
+    # from 0 up to that limit — slice out the requested window.
+    items = items[req.offset : req.offset + PAGE_SIZE]
 
     results = [item_to_dict(item, req.media_type) for item in items]
     # Relevance boost: items whose title contains the query term first
@@ -100,7 +112,7 @@ async def search(req: SearchRequest):
         results.sort(
             key=lambda r: 0 if q in r.get("title", "").lower() else 1
         )
-    return {"results": results}
+    return {"results": results, "total": total}
 
 
 @router.get("/tracks/{item_id}")
