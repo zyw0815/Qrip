@@ -69,6 +69,13 @@ def get_config() -> Config:
     global _config, _logged_in
     if _config is None:
         _config = Config.defaults()
+        # Qrip's own defaults (overriding streamrip's blank template values)
+        s = _config.session
+        s.filepaths.folder_format = "{artist} — {album} ({year})"
+        s.filepaths.track_format = "{artist} — {title}"
+        s.artwork.save_artwork = False
+        if not s.downloads.folder:
+            s.downloads.folder = os.path.expanduser("~/Music/Qrip")
         if _load_saved_credentials(_config):
             _logged_in = True
     return _config
