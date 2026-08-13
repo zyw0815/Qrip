@@ -3,7 +3,17 @@ from pydantic import BaseModel
 import sys
 import os
 
-STREAMRIP_PATH = os.path.expanduser("~/Study/MyProject/streamrip")
+# streamrip is vendored inside the Qrip repo (../streamrip). Use it when
+# present so packaged builds are self-contained; fall back to the dev
+# machine path when running from a bare checkout.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_QRIP_ROOT = os.path.normpath(os.path.join(_HERE, ".."))
+# sys.path entries are search roots: importing "streamrip" looks for
+# <root>/streamrip/__init__.py, so the Qrip repo root is the entry.
+if os.path.isdir(os.path.join(_QRIP_ROOT, "streamrip", "client")):
+    STREAMRIP_PATH = _QRIP_ROOT
+else:
+    STREAMRIP_PATH = os.path.expanduser("~/Study/MyProject/streamrip")
 sys.path.insert(0, STREAMRIP_PATH)
 
 from auth import get_config
