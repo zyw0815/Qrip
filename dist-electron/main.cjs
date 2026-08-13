@@ -10,6 +10,17 @@ const electron_store_1 = __importDefault(require("electron-store"));
 const store = new electron_store_1.default({ name: 'qrip-config' });
 let mainWindow = null;
 let pythonProcess = null;
+// Qobuz sends X-User-Auth-Token header on authenticated API requests.
+// Intercept it during the OAuth window's session to capture credentials.
+function interceptQobuzAuth(session, onCaptured) {
+    session.webRequest.onBeforeSendHeaders({ urls: ['*://*.qobuz.com/*', '*://play.qobuz.com/*'] }, (details, callback) => {
+        const authToken = details.requestHeaders['X-User-Auth-Token'];
+        if (authToken && typeof authToken === 'string' && authToken.length > 10) {
+            onCaptured(authToken);
+        }
+        callback({ requestHeaders: details.requestHeaders });
+    });
+}
 function startPython() {
     const pythonPath = electron_1.app.isPackaged
         ? path_1.default.join(process.resourcesPath, 'python', 'venv', 'bin', 'python3')
@@ -69,147 +80,56 @@ electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
         authWin.loadURL(url);
         let resolved = false;
         let pollInterval = null;
+        let capturedToken = '';
         const finish = (token) => {
             if (resolved)
                 return;
             resolved = true;
             if (pollInterval)
                 clearInterval(pollInterval);
+            authWin.webContents.session.webRequest.onBeforeSendHeaders(null);
             authWin.removeAllListeners();
             if (!authWin.isDestroyed())
                 authWin.close();
             resolve(token);
         };
-        // Poll every 2s — login completes asynchronously; the auth cookie
-        // appears only after the Google→Qobuz handshake finishes.
-        pollInterval = setInterval(async () => {
+        // Capture X-User-Auth-Token from any authenticated Qobuz API call.
+        // This is the reliable way — the web player sends it on every
+        // request after login.
+        interceptQobuzAuth(authWin.webContents.session, (token) => {
             if (resolved)
                 return;
-            const currentUrl = authWin.webContents.getURL();
-            if (!currentUrl.includes('play.qobuz.com') && !currentUrl.includes('qobuz.com'))
+            console.log(`[oauth] captured X-User-Auth-Token (${token.length} chars)`);
+            capturedToken = token;
+        });
+        // Poll every 2s — once we have a captured token, pair it with
+        // the user id from localStorage and finish.
+        pollInterval = setInterval(async () => {
+            if (resolved || !capturedToken)
                 return;
             try {
-                // Session API sees HttpOnly cookies too
-                const cookies = await authWin.webContents.session.cookies.get({ url: 'https://play.qobuz.com' });
-                let token = '';
-                // Qobuz stores credentials in 'userCookie' (JSON with user_auth_token)
-                for (const c of cookies) {
-                    if (c.name === 'userCookie' && c.value.length > 10) {
-                        try {
-                            const parsed = JSON.parse(decodeURIComponent(c.value));
-                            token = parsed.user_auth_token || parsed.authToken || '';
-                        }
-                        catch {
-                            // maybe raw value
-                            token = c.value;
-                        }
-                    }
-                    if (!token && c.name.toLowerCase().includes('auth_token') && c.value.length > 10) {
-                        token = c.value;
-                    }
-                }
-                if (token) {
-                    let userId = '';
-                    try {
-                        const localUser = await authWin.webContents.executeJavaScript(`localStorage.getItem('localuser') || ''`);
-                        const parsed = JSON.parse(localUser);
-                        if (parsed.id)
-                            userId = String(parsed.id);
-                        else {
-                            const m = localUser.match(/"id":(\d+)/);
-                            if (m)
-                                userId = m[1];
-                        }
-                    }
-                    catch { /* ignore */ }
-                    console.log(`[oauth] poll: token=${token ? 'YES' : 'no'}, userId=${userId || 'no'}`);
-                    if (userId)
-                        finish(JSON.stringify({ token, userId }));
-                }
-            }
-            catch (err) {
-                console.log(`[oauth] poll error: ${err}`);
-            }
-        }, 2000);
-        authWin.on('closed', () => finish(null));
-        // Qobuz stores user_auth_token in a cookie (not localStorage).
-        // localStorage has 'localuser' with the user id.
-        authWin.webContents.on('did-finish-load', async () => {
-            const currentUrl = authWin.webContents.getURL();
-            console.log(`[oauth] page loaded: ${currentUrl}`);
-            // Only extract when we're on the Qobuz player domain (login finished)
-            if (!currentUrl.includes('play.qobuz.com') && !currentUrl.includes('qobuz.com'))
-                return;
-            try {
-                // Session API sees HttpOnly cookies too
-                const cookies = await authWin.webContents.session.cookies.get({ url: 'https://play.qobuz.com' });
-                let token = '';
-                // Qobuz stores credentials in 'userCookie' (JSON with user_auth_token)
-                for (const c of cookies) {
-                    if (c.name === 'userCookie' && c.value.length > 10) {
-                        try {
-                            const parsed = JSON.parse(decodeURIComponent(c.value));
-                            token = parsed.user_auth_token || parsed.authToken || '';
-                        }
-                        catch {
-                            // maybe raw value
-                            token = c.value;
-                        }
-                    }
-                    if (!token && c.name.toLowerCase().includes('auth_token') && c.value.length > 10) {
-                        token = c.value;
-                    }
-                }
-                // Fallback: document.cookie + localStorage scan
-                if (!token) {
-                    const jsResult = await authWin.webContents.executeJavaScript(`(() => {
-              let t = ''
-              const cs = document.cookie.split(';')
-              for (const c of cs) {
-                const [name, ...rest] = c.trim().split('=')
-                const val = rest.join('=')
-                if (name === 'userCookie' && val.length > 10) {
-                  try {
-                    const p = JSON.parse(decodeURIComponent(val))
-                    if (p.user_auth_token) t = p.user_auth_token
-                  } catch { t = val }
-                }
-                if (!t && name.toLowerCase().includes('auth_token') && val.length > 10) t = val
-              }
-              if (!t) {
-                for (let i = 0; i < localStorage.length; i++) {
-                  const key = localStorage.key(i) || ''
-                  const val = localStorage.getItem(key) || ''
-                  if (key.toLowerCase().includes('auth_token') && val.length > 10) t = val
-                }
-              }
-              return t
-            })()`);
-                    if (jsResult && jsResult.length > 10)
-                        token = jsResult;
-                }
-                // User id from localuser key
                 let userId = '';
                 const localUser = await authWin.webContents.executeJavaScript(`localStorage.getItem('localuser') || ''`);
                 try {
                     const parsed = JSON.parse(localUser);
                     if (parsed.id)
                         userId = String(parsed.id);
+                    else {
+                        const m = localUser.match(/"id":(\d+)/);
+                        if (m)
+                            userId = m[1];
+                    }
                 }
-                catch {
-                    const m = localUser.match(/"id":(\d+)/);
-                    if (m)
-                        userId = m[1];
-                }
-                console.log(`[oauth] token found: ${token ? 'YES (' + token.length + ' chars)' : 'no'}, userId: ${userId || 'no'}`);
-                if (token && token.length > 10 && userId) {
-                    finish(JSON.stringify({ token, userId }));
-                }
+                catch { /* ignore */ }
+                console.log(`[oauth] poll: token=YES, userId=${userId || 'no'}`);
+                if (userId)
+                    finish(JSON.stringify({ token: capturedToken, userId }));
             }
             catch (err) {
-                console.log(`[oauth] scan error: ${err}`);
+                console.log(`[oauth] poll error: ${err}`);
             }
-        });
+        }, 2000);
+        authWin.on('closed', () => finish(null));
     });
 });
 electron_1.ipcMain.handle('store:get', (_e, key) => store.get(key));
