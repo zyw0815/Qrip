@@ -45,7 +45,7 @@ function createWindow() {
         titleBarStyle: 'hiddenInset',
         title: 'Qrip',
         webPreferences: {
-            preload: path_1.default.join(__dirname, 'preload.js'),
+            preload: path_1.default.join(__dirname, 'preload.cjs'),
             contextIsolation: true,
             nodeIntegration: false,
         },
