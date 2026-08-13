@@ -92,18 +92,18 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
           className="w-full h-[52px] bg-purple text-white rounded-xl text-lg font-semibold flex items-center justify-center gap-2.5 hover:bg-[#6d28d9] transition disabled:opacity-50 shadow-[0_4px_20px_rgba(124,58,237,0.35)]"
         >
           <span className="text-xl">🎵</span>
-          {loading ? 'Opening...' : '登录 Qobuz'}
+          {loading ? 'Opening...' : 'Sign in with Qobuz'}
         </button>
         <p className="text-sm text-text-muted mt-3">
           {isElectron
-            ? '弹出 Qobuz 登录窗口，登录后自动完成认证'
-            : '弹窗登录仅在桌面 App 中可用，请使用下方 Token 登录'}
+            ? 'Opens the Qobuz sign-in window — any login method works'
+            : 'Popup login is only available in the desktop app. Use Token login below.'}
         </p>
 
         {/* Divider */}
         <div className="flex items-center gap-3 my-7">
           <div className="flex-1 h-px bg-border" />
-          <span className="text-sm text-text-muted">或</span>
+          <span className="text-sm text-text-muted">or</span>
           <div className="flex-1 h-px bg-border" />
         </div>
 
@@ -113,14 +113,14 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
             onClick={() => setShowToken(true)}
             className="text-sm text-text-secondary hover:text-purple-light transition"
           >
-            使用 Token 登录 ▾
+            Sign in with Token ▾
           </button>
         ) : (
           <div className="flex flex-col gap-3 animate-fade-in text-left">
             <textarea
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              placeholder="粘贴你的 Qobuz auth token..."
+              placeholder="Paste your Qobuz auth token..."
               className="w-full h-24 bg-bg-input border border-border rounded-lg px-3 py-2.5 text-base text-text-primary placeholder:text-text-muted outline-none focus:border-purple transition resize-none"
             />
             <button
@@ -128,7 +128,7 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
               disabled={loading || !token.trim()}
               className="w-full h-[46px] bg-bg-input border border-border text-text-primary rounded-lg text-base font-medium hover:border-purple hover:text-purple-light transition disabled:opacity-50"
             >
-              {loading ? 'Authenticating...' : 'Token 认证'}
+              {loading ? 'Authenticating...' : 'Authenticate with Token'}
             </button>
           </div>
         )}
