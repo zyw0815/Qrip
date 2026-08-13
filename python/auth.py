@@ -83,6 +83,8 @@ def get_config() -> Config:
 
 @router.get("/status")
 async def auth_status():
+    # Trigger credential loading from disk if not yet initialized
+    get_config()
     if _DEV_MODE:
         return {"authenticated": True}
     return {"authenticated": _logged_in}
