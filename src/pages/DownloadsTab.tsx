@@ -10,6 +10,7 @@ interface DownloadItem {
   total: number
   speed: string
   status: 'downloading' | 'queued' | 'paused' | 'completed' | 'failed'
+  paused?: boolean
 }
 
 export default function DownloadsTab() {
@@ -34,6 +35,9 @@ export default function DownloadsTab() {
 
   const pause = async (id: string) => {
     await fetch(`${API_BASE}/download/${id}/pause`, { method: 'POST' })
+  }
+  const resume = async (id: string) => {
+    await fetch(`${API_BASE}/download/${id}/resume`, { method: 'POST' })
   }
   const cancel = async (id: string) => {
     await fetch(`${API_BASE}/download/${id}/cancel`, { method: 'POST' })
@@ -77,14 +81,24 @@ export default function DownloadsTab() {
               <ProgressBar
                 percent={d.total > 0 ? (d.downloaded / d.total) * 100 : 0}
               />
-              <div className="flex justify-between mt-1.5">
-                <span className="text-[10px] text-text-muted">{d.speed} MB/s</span>
-                <span
-                  className="text-[10px] text-text-muted cursor-pointer hover:text-text-secondary select-none"
-                  onClick={() => pause(d.item_id)}
-                >
-                  ⏸ Pause
+              <div className="flex justify-between mt-1.5 items-center">
+                <span className="text-[10px] text-text-muted">
+                  {d.paused ? 'Paused' : `${d.speed} MB/s`}
                 </span>
+                <div className="flex gap-2.5">
+                  <span
+                    className="text-[10px] text-text-muted cursor-pointer hover:text-text-secondary select-none"
+                    onClick={() => (d.paused ? resume(d.item_id) : pause(d.item_id))}
+                  >
+                    {d.paused ? '▶ Resume' : '⏸ Pause'}
+                  </span>
+                  <span
+                    className="text-[10px] text-text-muted cursor-pointer hover:text-red-400 select-none"
+                    onClick={() => cancel(d.item_id)}
+                  >
+                    ✕
+                  </span>
+                </div>
               </div>
             </div>
           ))}
