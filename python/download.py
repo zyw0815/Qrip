@@ -13,6 +13,7 @@ from streamrip.client.qobuz import QobuzClient
 from streamrip.media.album import PendingAlbum
 from streamrip.media.track import PendingSingle
 from streamrip.media.playlist import PendingPlaylist
+from streamrip.media.artwork import remove_artwork_tempdirs
 from streamrip.db import Database, Downloads, Failed
 from auth import get_config
 
@@ -155,6 +156,8 @@ async def _download_worker():
 
             # Run rip pipeline (preprocess -> download -> postprocess)
             await media.rip()
+            # Clean up __artwork temp dirs created during cover embedding
+            remove_artwork_tempdirs()
 
             item["status"] = "completed"
             _completed.append(item)

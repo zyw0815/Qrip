@@ -83,17 +83,12 @@ export default function SearchResultCard(p: ResultProps) {
           )}
 
           <div className="flex gap-2">
-            {/* All types get a Download button */}
+            {/* All types get a Download button — stays purple */}
             <button
               onClick={p.onDownload}
-              disabled={p.type === 'track' && p.added}
-              className={`h-[30px] px-4 rounded-md text-[11px] font-medium transition ${
-                p.type === 'track' && p.added
-                  ? 'bg-green-900/20 text-green-quality border border-green-900/40'
-                  : 'bg-purple text-white hover:bg-[#6d28d9]'
-              }`}
+              className="h-[30px] px-4 bg-purple text-white rounded-md text-[11px] font-medium hover:bg-[#6d28d9] transition"
             >
-              {p.type === 'track' && p.added ? '✓ Added' : 'Download'}
+              Download
             </button>
             {(p.type === 'album' || p.type === 'playlist') && p.onView && (
               <button
@@ -122,14 +117,9 @@ export default function SearchResultCard(p: ResultProps) {
               </div>
               <button
                 onClick={() => p.onTrackDownload?.(t.id)}
-                disabled={t.added}
-                className={`h-[24px] px-3 rounded text-[10px] transition flex-shrink-0 ${
-                  t.added
-                    ? 'bg-green-900/20 text-green-quality border border-green-900/40'
-                    : 'bg-purple text-white hover:bg-[#6d28d9]'
-                }`}
+                className="h-[24px] px-3 bg-purple text-white rounded text-[10px] hover:bg-[#6d28d9] transition flex-shrink-0"
               >
-                {t.added ? '✓' : 'Download'}
+                Download
               </button>
             </div>
           ))}
