@@ -28,11 +28,19 @@ export default function MainLayout() {
         <TabBar tabs={TABS} active={activeTab} onChange={setActiveTab} />
       </div>
 
-      {/* Tab content */}
-      <div className="flex-1 scroll-stable" key={activeTab}>
-        {activeTab === 'search' && <SearchTab />}
-        {activeTab === 'downloads' && <DownloadsTab />}
-        {activeTab === 'settings' && <SettingsTab />}
+      {/* Tab content — all tabs stay mounted; CSS toggles visibility
+          so search results, download polling, and loaded settings survive
+          tab switches */}
+      <div className="flex-1 scroll-stable">
+        <div className={activeTab === 'search' ? '' : 'hidden'}>
+          <SearchTab />
+        </div>
+        <div className={activeTab === 'downloads' ? '' : 'hidden'}>
+          <DownloadsTab />
+        </div>
+        <div className={activeTab === 'settings' ? '' : 'hidden'}>
+          <SettingsTab />
+        </div>
       </div>
     </div>
   )
