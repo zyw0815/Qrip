@@ -256,6 +256,7 @@ function formatResult(item: Record<string, any>): Result {
   // Resolve returns {type, data}; search returns the item directly
   const d = item.data || item
   const meta: string[] = []
+  if (d.album_title) meta.push(`💿 ${d.album_title}`)
   if (d.year) meta.push(String(d.year))
   if (d.tracks_count) meta.push(`${d.tracks_count} tracks`)
   if (d.duration) {

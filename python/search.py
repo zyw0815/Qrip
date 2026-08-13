@@ -58,6 +58,7 @@ def item_to_dict(item: dict, media_type: str) -> dict:
         result["artist"] = item.get("performer", {}).get("name") or "Unknown"
         result["duration"] = item.get("duration", 0)
         album = item.get("album", {}) or {}
+        result["album_title"] = album.get("title", "")
         image = album.get("image", {}) or {}
         result["cover"] = image.get("large") or image.get("small") or ""
         result["bit_depth"] = item.get("maximum_bit_depth")
@@ -93,6 +94,12 @@ async def search(req: SearchRequest):
         items = resp.get(key, {}).get("items", [])
 
     results = [item_to_dict(item, req.media_type) for item in items]
+    # Relevance boost: items whose title contains the query term first
+    if req.media_type == "track" and results:
+        q = req.query.lower()
+        results.sort(
+            key=lambda r: 0 if q in r.get("title", "").lower() else 1
+        )
     return {"results": results}
 
 
