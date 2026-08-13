@@ -3,7 +3,8 @@ from pydantic import BaseModel
 import sys
 import os
 import asyncio
-import math
+import time
+from pathlib import Path
 from typing import Optional
 
 STREAMRIP_PATH = os.path.expanduser("~/Study/MyProject/streamrip")
@@ -128,6 +129,10 @@ async def _download_worker():
 
         try:
             cfg = get_config()
+            # Serial downloads — one track at a time (like streamrip CLI)
+            cfg.session.downloads.concurrency = False
+            # Disable rich terminal progress bars (we poll files instead)
+            cfg.session.cli.progress_bars = False
             client = QobuzClient(cfg)
             await client.login()
 
@@ -145,20 +150,29 @@ async def _download_worker():
             if media is None:
                 raise Exception("Failed to resolve media")
 
-            # Set name from resolved media
-            if hasattr(media, 'album'):
-                item["name"] = getattr(media, 'album', media_type)
-                item["album"] = getattr(media, 'albumartist', '')
-            elif hasattr(media, 'title'):
-                item["name"] = media.title
-                if hasattr(media, 'album'):
-                    item["album"] = media.album.album if media.album else ''
+            # Set display name from resolved media metadata
+            if media_type in ("album", "playlist"):
+                item["name"] = media.meta.album
+                item["album"] = media.meta.albumartist
+            elif media_type == "track":
+                item["name"] = media.meta.title
+                item["album"] = media.meta.album.album if media.meta.album else ""
 
-            # Run rip pipeline (preprocess -> download -> postprocess)
-            await media.rip()
+            # Estimate total size + poll folder for progress while ripping
+            download_folder = cfg.session.downloads.folder
+            total_size = await _estimate_size(client, item_id, media_type, quality)
+
+            rip_task = asyncio.create_task(media.rip())
+            _progress_poll = asyncio.create_task(
+                _poll_progress(item, download_folder, total_size)
+            )
+            await rip_task
+            _progress_poll.cancel()
+
             # Clean up __artwork temp dirs created during cover embedding
             remove_artwork_tempdirs()
 
+            item["downloaded"] = item["total"] if item["total"] > 0 else total_size
             item["status"] = "completed"
             _completed.append(item)
 
@@ -170,3 +184,60 @@ async def _download_worker():
             _downloading.pop(item_id, None)
 
         await asyncio.sleep(0.1)
+
+
+async def _estimate_size(client: QobuzClient, item_id: str, media_type: str, quality: int) -> int:
+    """Estimate total download size in MB by summing track sizes."""
+    try:
+        if media_type == "track":
+            downloadables = [await client.get_downloadable(item_id, quality)]
+        else:
+            resp = await client.get_metadata(item_id, media_type)
+            if media_type == "playlist":
+                track_ids = [t.get("id") for t in resp.get("tracks", {}).get("items", [])]
+            else:
+                track_ids = [t.get("id") for t in resp.get("tracks", {}).get("items", [])]
+            downloadables = []
+            for tid in track_ids[:500]:
+                try:
+                    downloadables.append(await client.get_downloadable(str(tid), quality))
+                except Exception:
+                    pass
+
+        total_bytes = 0
+        for d in downloadables:
+            try:
+                total_bytes += await d.size()
+            except Exception:
+                pass
+        return round(total_bytes / (1024 * 1024), 1)
+    except Exception:
+        return 0
+
+
+async def _poll_progress(item: dict, download_folder: str, total_size: int) -> None:
+    """Poll the download folder for file sizes to derive progress and speed."""
+    item["total"] = total_size
+    last_bytes = 0.0
+    last_time = time.time()
+    try:
+        while True:
+            await asyncio.sleep(1)
+            current_bytes = 0.0
+            try:
+                for f in Path(download_folder).rglob("*.flac"):
+                    current_bytes += f.stat().st_size
+                for f in Path(download_folder).rglob("*.mp3"):
+                    current_bytes += f.stat().st_size
+            except Exception:
+                pass
+            current_mb = current_bytes / (1024 * 1024)
+            now = time.time()
+            delta_time = now - last_time
+            speed = (current_mb - last_bytes) / delta_time if delta_time > 0 else 0
+            item["downloaded"] = round(current_mb, 1)
+            item["speed"] = f"{speed:.1f}"
+            last_bytes = current_mb
+            last_time = now
+    except asyncio.CancelledError:
+        pass
