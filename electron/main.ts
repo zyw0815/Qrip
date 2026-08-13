@@ -80,10 +80,16 @@ function createWindow() {
 // IPC Handlers
 ipcMain.handle('open-oauth', async (_e, url: string) => {
   return new Promise<string | null>((resolve) => {
+    // Fresh in-memory partition every time — no cookies, no remembered
+    // Google account. The user always starts from a clean login page.
+    const partition = `oauth-${Date.now()}-${Math.random().toString(36).slice(2)}`
     const authWin = new BrowserWindow({
       width: 1200,
       height: 800,
       title: 'Qrip — Google Login',
+      webPreferences: {
+        partition,
+      },
     })
     authWin.loadURL(url)
 
@@ -98,6 +104,8 @@ ipcMain.handle('open-oauth', async (_e, url: string) => {
       authWin.webContents.session.webRequest.onBeforeSendHeaders(null)
       authWin.removeAllListeners()
       if (!authWin.isDestroyed()) authWin.close()
+      // Drop the session's in-memory data so nothing lingers.
+      authWin.webContents.session.clearStorageData()
       resolve(token)
     }
 

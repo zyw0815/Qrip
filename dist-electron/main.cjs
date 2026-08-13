@@ -72,10 +72,16 @@ function createWindow() {
 // IPC Handlers
 electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
     return new Promise((resolve) => {
+        // Fresh in-memory partition every time — no cookies, no remembered
+        // Google account. The user always starts from a clean login page.
+        const partition = `oauth-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const authWin = new electron_1.BrowserWindow({
             width: 1200,
             height: 800,
             title: 'Qrip — Google Login',
+            webPreferences: {
+                partition,
+            },
         });
         authWin.loadURL(url);
         let resolved = false;
@@ -91,6 +97,8 @@ electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
             authWin.removeAllListeners();
             if (!authWin.isDestroyed())
                 authWin.close();
+            // Drop the session's in-memory data so nothing lingers.
+            authWin.webContents.session.clearStorageData();
             resolve(token);
         };
         // Capture X-User-Auth-Token from any authenticated Qobuz API call.

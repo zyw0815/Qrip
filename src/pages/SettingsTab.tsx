@@ -285,10 +285,6 @@ export default function SettingsTab() {
             className="h-9 px-3.5 border border-red-500 text-red-500 rounded text-[13px] hover:bg-red-500/10 transition flex-shrink-0"
           >Sign Out</button>
         </div>
-        <div className="px-3 py-2 bg-bg-input border border-border rounded-lg flex justify-between items-center cursor-pointer hover:border-text-muted transition-colors">
-          <span className="text-lg text-text-muted">🐙 Add another Qobuz account</span>
-          <span className="text-base text-purple-light">▾</span>
-        </div>
       </section>
 
       {/* ABOUT */}
