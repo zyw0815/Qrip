@@ -8,6 +8,7 @@ export interface ResultProps {
   meta: string[]
   qualityTags: string[]
   selected?: boolean
+  added?: boolean
   onDownload: () => void
   onView?: () => void
   onAdd?: () => void
@@ -106,9 +107,14 @@ export default function SearchResultCard(p: ResultProps) {
           {p.type === 'track' && p.onAdd && (
             <button
               onClick={p.onAdd}
-              className="h-[26px] px-4 bg-bg-input text-text-secondary border border-border rounded-md text-[10px] hover:border-text-muted hover:text-text-primary transition"
+              disabled={p.added}
+              className={`h-[26px] px-4 rounded-md text-[10px] transition ${
+                p.added
+                  ? 'bg-green-900/20 text-green-quality border border-green-900/40'
+                  : 'bg-bg-input text-text-secondary border border-border hover:border-text-muted hover:text-text-primary'
+              }`}
             >
-              + Add
+              {p.added ? '✓ Added' : '+ Add'}
             </button>
           )}
         </div>

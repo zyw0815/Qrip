@@ -80,12 +80,21 @@ export default function SearchTab() {
     }
   }
 
-  const addToQueue = (result: Result) => {
-    fetch(`${API_BASE}/download/add`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ item_id: result.id, media_type: result.type }),
-    }).catch(console.error)
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
+
+  const addToQueue = async (result: Result) => {
+    try {
+      const r = await fetch(`${API_BASE}/download/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: result.id, media_type: result.type }),
+      })
+      if (r.ok) {
+        setAddedIds((prev) => new Set(prev).add(result.id))
+      }
+    } catch {
+      setError('Failed to add to download queue')
+    }
   }
 
   return (
@@ -200,6 +209,7 @@ export default function SearchTab() {
             key={`${r.id}-${i}`}
             {...r}
             selected={i === 0}
+            added={addedIds.has(r.id)}
             onDownload={() => addToQueue(r)}
             onAdd={r.type === 'track' ? () => addToQueue(r) : undefined}
             onView={() => {}} // expand tracks - for V1 refinement
