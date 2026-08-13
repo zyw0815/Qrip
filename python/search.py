@@ -45,7 +45,7 @@ def item_to_dict(item: dict, media_type: str) -> dict:
             import datetime
             released = datetime.datetime.fromtimestamp(released).strftime("%Y-%m-%d")
         result["year"] = str(released)[:10]
-        result["tracks_count"] = item.get("media_count") or item.get("tracks_count") or 0
+        result["tracks_count"] = item.get("tracks_count") or item.get("media_count") or 0
         result["duration"] = item.get("duration", 0)
         label_obj = item.get("label") or {}
         result["label"] = label_obj.get("name", "") if isinstance(label_obj, dict) else str(label_obj or "")
