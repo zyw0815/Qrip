@@ -32,7 +32,7 @@ export default function App() {
           <h1 className="text-[32px] font-extrabold tracking-[-0.5px] bg-gradient-to-r from-purple-light to-purple bg-clip-text text-transparent mb-3">
             Qrip
           </h1>
-          <p className="text-base text-text-muted">Starting up…</p>
+          <p className="text-lg text-text-muted">Starting up…</p>
         </div>
       </div>
     )

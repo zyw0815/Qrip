@@ -108,7 +108,7 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
         <h1 className="text-[32px] font-extrabold tracking-[-0.5px] bg-gradient-to-r from-purple-light to-purple bg-clip-text text-transparent mb-1">
           Qrip
         </h1>
-        <p className="text-sm text-text-muted mb-7">Sign in to start downloading</p>
+        <p className="text-base text-text-muted mb-7">Sign in to start downloading</p>
 
         {/* Method tabs */}
         <div className="flex border-b border-border mb-5">
@@ -122,7 +122,7 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
             <button
               key={key}
               onClick={() => { setMethod(key); setError('') }}
-              className={`flex-1 text-center py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              className={`flex-1 text-center py-2.5 text-base font-medium border-b-2 transition-colors ${
                 method === key
                   ? 'text-purple-light border-purple'
                   : 'text-text-muted border-transparent hover:text-text-secondary'
@@ -139,20 +139,20 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
             <button
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full h-11 bg-[#4285f4] text-white rounded-lg text-base font-medium flex items-center justify-center gap-2 hover:brightness-110 transition disabled:opacity-50"
+              className="w-full h-11 bg-[#4285f4] text-white rounded-lg text-lg font-medium flex items-center justify-center gap-2 hover:brightness-110 transition disabled:opacity-50"
             >
-              <span className="bg-white text-[#4285f4] w-5 h-5 rounded-full text-sm font-bold leading-5">
+              <span className="bg-white text-[#4285f4] w-5 h-5 rounded-full text-base font-bold leading-5">
                 G
               </span>
               Sign in with Google
             </button>
             {!isElectron && (
-              <p className="text-[12px] text-yellow-500/70 mt-2">
+              <p className="text-[13px] text-yellow-500/70 mt-2">
                 Google login is only available in the desktop app
               </p>
             )}
             {isElectron && (
-              <p className="text-[12px] text-text-muted mt-2.5">
+              <p className="text-[13px] text-text-muted mt-2.5">
                 Opens a secure browser for Google authentication
               </p>
             )}
@@ -167,19 +167,19 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email address"
-              className="w-full h-[42px] bg-bg-input border border-border rounded-lg px-3 text-base text-text-primary placeholder:text-text-muted outline-none focus:border-purple transition"
+              className="w-full h-[46px] bg-bg-input border border-border rounded-lg px-3 text-lg text-text-primary placeholder:text-text-muted outline-none focus:border-purple transition"
             />
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
-              className="w-full h-[42px] bg-bg-input border border-border rounded-lg px-3 text-base text-text-primary placeholder:text-text-muted outline-none focus:border-purple transition"
+              className="w-full h-[46px] bg-bg-input border border-border rounded-lg px-3 text-lg text-text-primary placeholder:text-text-muted outline-none focus:border-purple transition"
             />
             <button
               onClick={handleEmailLogin}
               disabled={loading || !email || !password}
-              className="w-full h-[42px] bg-purple text-white rounded-lg text-base font-medium hover:bg-[#6d28d9] transition disabled:opacity-50"
+              className="w-full h-[46px] bg-purple text-white rounded-lg text-lg font-medium hover:bg-[#6d28d9] transition disabled:opacity-50"
             >
               {loading ? 'Signing in...' : 'Sign in with Email'}
             </button>
@@ -193,19 +193,19 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
               value={token}
               onChange={(e) => setToken(e.target.value)}
               placeholder="Paste your Qobuz auth token..."
-              className="w-full h-20 bg-bg-input border border-border rounded-lg px-3 py-2.5 text-base text-text-primary placeholder:text-text-muted outline-none focus:border-purple transition resize-none"
+              className="w-full h-20 bg-bg-input border border-border rounded-lg px-3 py-2.5 text-lg text-text-primary placeholder:text-text-muted outline-none focus:border-purple transition resize-none"
             />
             <button
               onClick={handleTokenLogin}
               disabled={loading || !token.trim()}
-              className="w-full h-[42px] bg-purple text-white rounded-lg text-base font-medium hover:bg-[#6d28d9] transition disabled:opacity-50"
+              className="w-full h-[46px] bg-purple text-white rounded-lg text-lg font-medium hover:bg-[#6d28d9] transition disabled:opacity-50"
             >
               {loading ? 'Authenticating...' : 'Authenticate with Token'}
             </button>
           </div>
         )}
 
-        {error && <p className="text-red-500 text-sm mt-4 animate-fade-in">{error}</p>}
+        {error && <p className="text-red-500 text-base mt-4 animate-fade-in">{error}</p>}
       </div>
     </div>
   )
