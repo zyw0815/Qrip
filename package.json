@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "build:electron": "tsc electron/main.ts electron/preload.ts --outDir dist-electron --module commonjs --target ES2020 --moduleResolution node --skipLibCheck --esModuleInterop && mv dist-electron/main.js dist-electron/main.cjs && mv dist-electron/preload.js dist-electron/preload.cjs && sed -i '' 's/preload\\.js/preload.cjs/' dist-electron/main.cjs",
     "electron:dev": "npm run build:electron && concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
-    "electron:build": "vite build && electron-builder",
+    "electron:build": "npm run build:electron && vite build && electron-builder",
     "build:backend": "cd python && pyinstaller --onefile --name qrip-server --add-data \"../streamrip/config.toml:streamrip\" --paths . --paths .. server.py"
   },
   "dependencies": {
@@ -46,7 +46,8 @@
       "target": "nsis"
     },
     "files": [
-      "dist/**/*",
+      "dist/index.html",
+      "dist/assets/**/*",
       "dist-electron/**/*"
     ],
     "extraResources": [
@@ -54,6 +55,9 @@
         "from": "python/dist/qrip-server",
         "to": "backend/qrip-server"
       }
-    ]
+    ],
+    "directories": {
+      "output": "release"
+    }
   }
 }

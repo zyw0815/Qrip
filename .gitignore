@@ -10,3 +10,4 @@ CLAUDE.md
 python/dist/
 python/build/
 *.spec
+release/
