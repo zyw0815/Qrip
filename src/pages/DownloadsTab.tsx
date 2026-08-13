@@ -62,42 +62,42 @@ export default function DownloadsTab() {
       {/* Active downloads */}
       {downloading.length > 0 && (
         <>
-          <p className="text-[9px] text-text-muted tracking-wider mb-2 font-medium uppercase">
+          <p className="text-xs text-text-muted tracking-wider mb-2.5 font-semibold uppercase">
             Downloading — {downloading.length} active
           </p>
           {downloading.map((d) => (
             <div
               key={d.item_id}
-              className="bg-bg-card/40 border border-border rounded-lg p-3.5 mb-2 hover:border-purple/25 transition"
+              className="bg-bg-card/40 border border-border rounded-xl p-4 mb-2.5 hover:border-purple/25 transition"
             >
-              <div className="flex justify-between items-center mb-1.5">
-                <span className="text-xs text-text-primary font-medium truncate mr-2">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-text-primary font-medium truncate mr-2">
                   {d.name}
                 </span>
-                <span className="text-[10px] text-purple-light flex-shrink-0">
+                <span className="text-sm text-purple-light flex-shrink-0 font-medium">
                   {d.downloaded} MB / {d.total} MB
                 </span>
               </div>
               <ProgressBar
                 percent={d.total > 0 ? (d.downloaded / d.total) * 100 : 0}
               />
-              <div className="flex justify-between mt-1.5 items-center">
-                <span className="text-[10px] text-text-muted">
-                  {d.paused ? 'Paused' : `${d.speed} MB/s`}
+              <div className="flex justify-between mt-2.5 items-center">
+                <span className="text-xs text-text-muted">
+                  {d.paused ? '⏸ Paused' : `${d.speed} MB/s`}
                 </span>
-                <div className="flex gap-2.5">
-                  <span
-                    className="text-[10px] text-text-muted cursor-pointer hover:text-text-secondary select-none"
+                <div className="flex gap-2">
+                  <button
                     onClick={() => (d.paused ? resume(d.item_id) : pause(d.item_id))}
+                    className="h-8 px-3.5 bg-bg-input border border-border rounded-md text-xs text-text-secondary hover:border-purple hover:text-purple-light transition select-none"
                   >
                     {d.paused ? '▶ Resume' : '⏸ Pause'}
-                  </span>
-                  <span
-                    className="text-[10px] text-text-muted cursor-pointer hover:text-red-400 select-none"
+                  </button>
+                  <button
                     onClick={() => cancel(d.item_id)}
+                    className="h-8 px-3.5 bg-bg-input border border-border rounded-md text-xs text-text-secondary hover:border-red-500 hover:text-red-400 transition select-none"
                   >
-                    ✕
-                  </span>
+                    ✕ Delete
+                  </button>
                 </div>
               </div>
             </div>
@@ -108,28 +108,28 @@ export default function DownloadsTab() {
       {/* Queued */}
       {queued.length > 0 && (
         <>
-          <p className="text-[9px] text-text-muted tracking-wider mb-2 mt-4 font-medium uppercase">
+          <p className="text-xs text-text-muted tracking-wider mb-2.5 mt-5 font-semibold uppercase">
             Queued
           </p>
           {queued.map((q, i) => (
             <div
               key={q.item_id}
-              className="bg-bg-card/20 border border-border rounded-lg px-3.5 py-3 mb-1.5 flex items-center gap-2.5"
+              className="bg-bg-card/20 border border-border rounded-xl px-4 py-3.5 mb-2 flex items-center gap-3"
             >
-              <span className="text-sm flex-shrink-0">⏳</span>
+              <span className="text-base flex-shrink-0">⏳</span>
               <div className="flex-1 min-w-0">
-                <div className="text-[11px] text-text-primary truncate">{q.name}</div>
-                <div className="text-[10px] text-text-muted truncate">{q.album}</div>
+                <div className="text-sm text-text-primary truncate">{q.name}</div>
+                <div className="text-xs text-text-muted truncate mt-0.5">{q.album}</div>
               </div>
-              <span className="text-[10px] text-text-muted flex-shrink-0">
+              <span className="text-xs text-text-muted flex-shrink-0">
                 #{downloading.length + i + 1}
               </span>
-              <span
-                className="text-[10px] text-text-muted cursor-pointer hover:text-red-400 flex-shrink-0"
+              <button
                 onClick={() => cancel(q.item_id)}
+                className="h-8 px-3 bg-bg-input border border-border rounded-md text-xs text-text-secondary hover:border-red-500 hover:text-red-400 transition flex-shrink-0"
               >
-                ✕
-              </span>
+                ✕ Delete
+              </button>
             </div>
           ))}
         </>
