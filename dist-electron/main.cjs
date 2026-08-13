@@ -92,10 +92,20 @@ electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
                 // Session API sees HttpOnly cookies too
                 const cookies = await authWin.webContents.session.cookies.get({ url: 'https://play.qobuz.com' });
                 let token = '';
+                // Qobuz stores credentials in 'userCookie' (JSON with user_auth_token)
                 for (const c of cookies) {
-                    if (c.name.toLowerCase().includes('auth_token') && c.value.length > 10) {
+                    if (c.name === 'userCookie' && c.value.length > 10) {
+                        try {
+                            const parsed = JSON.parse(decodeURIComponent(c.value));
+                            token = parsed.user_auth_token || parsed.authToken || '';
+                        }
+                        catch {
+                            // maybe raw value
+                            token = c.value;
+                        }
+                    }
+                    if (!token && c.name.toLowerCase().includes('auth_token') && c.value.length > 10) {
                         token = c.value;
-                        break;
                     }
                 }
                 if (token) {
@@ -131,15 +141,23 @@ electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
             if (!currentUrl.includes('play.qobuz.com') && !currentUrl.includes('qobuz.com'))
                 return;
             try {
-                // Get ALL cookies (including HttpOnly) via Electron session API
+                // Session API sees HttpOnly cookies too
                 const cookies = await authWin.webContents.session.cookies.get({ url: 'https://play.qobuz.com' });
-                const cookieKeys = cookies.map((c) => c.name).join(',');
-                console.log(`[oauth] cookies: ${cookieKeys}`);
                 let token = '';
+                // Qobuz stores credentials in 'userCookie' (JSON with user_auth_token)
                 for (const c of cookies) {
-                    if (c.name.toLowerCase().includes('auth_token') && c.value.length > 10) {
+                    if (c.name === 'userCookie' && c.value.length > 10) {
+                        try {
+                            const parsed = JSON.parse(decodeURIComponent(c.value));
+                            token = parsed.user_auth_token || parsed.authToken || '';
+                        }
+                        catch {
+                            // maybe raw value
+                            token = c.value;
+                        }
+                    }
+                    if (!token && c.name.toLowerCase().includes('auth_token') && c.value.length > 10) {
                         token = c.value;
-                        break;
                     }
                 }
                 // Fallback: document.cookie + localStorage scan
@@ -150,7 +168,13 @@ electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
               for (const c of cs) {
                 const [name, ...rest] = c.trim().split('=')
                 const val = rest.join('=')
-                if (name.toLowerCase().includes('auth_token') && val.length > 10) t = val
+                if (name === 'userCookie' && val.length > 10) {
+                  try {
+                    const p = JSON.parse(decodeURIComponent(val))
+                    if (p.user_auth_token) t = p.user_auth_token
+                  } catch { t = val }
+                }
+                if (!t && name.toLowerCase().includes('auth_token') && val.length > 10) t = val
               }
               if (!t) {
                 for (let i = 0; i < localStorage.length; i++) {
