@@ -18,7 +18,7 @@ export default function TabBar({
         <button
           key={t.key}
           onClick={() => onChange(t.key)}
-          className={`px-5 py-2 rounded-t-md text-sm font-medium transition-colors ${
+          className={`px-5 py-2 rounded-t-md text-base font-medium transition-colors ${
             active === t.key
               ? 'text-purple-light bg-purple-ghost'
               : 'text-text-muted hover:text-text-secondary hover:bg-white/5'

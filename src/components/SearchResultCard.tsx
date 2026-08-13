@@ -52,22 +52,22 @@ export default function SearchResultCard(p: ResultProps) {
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <span className="text-sm font-semibold text-text-primary truncate">
+            <span className="text-base font-semibold text-text-primary truncate">
               {p.title}
             </span>
             <span
-              className={`text-[8px] px-1.5 py-0.5 rounded font-medium uppercase ${typeBadge[p.type]}`}
+              className={`text-[13px] px-1.5 py-0.5 rounded font-medium uppercase ${typeBadge[p.type]}`}
             >
               {p.type}
             </span>
           </div>
 
-          <div className="text-[11px] text-text-secondary mb-1">{p.artist}</div>
+          <div className="text-[13px] text-text-secondary mb-1">{p.artist}</div>
 
           {p.meta.length > 0 && (
             <div className="flex gap-3.5 flex-wrap mb-2">
               {p.meta.map((m, i) => (
-                <span key={i} className="text-[10px] text-text-muted">
+                <span key={i} className="text-[12px] text-text-muted">
                   {m}
                 </span>
               ))}
@@ -86,14 +86,14 @@ export default function SearchResultCard(p: ResultProps) {
             {/* All types get a Download button — stays purple */}
             <button
               onClick={p.onDownload}
-              className="h-[30px] px-4 bg-purple text-white rounded-md text-[11px] font-medium hover:bg-[#6d28d9] transition"
+              className="h-[34px] px-4 bg-purple text-white rounded-md text-[13px] font-medium hover:bg-[#6d28d9] transition"
             >
               Download
             </button>
             {(p.type === 'album' || p.type === 'playlist') && p.onView && (
               <button
                 onClick={p.onView}
-                className="h-[30px] px-4 bg-bg-input text-text-secondary border border-border rounded-md text-[11px] hover:border-text-muted transition"
+                className="h-[34px] px-4 bg-bg-input text-text-secondary border border-border rounded-md text-[13px] hover:border-text-muted transition"
               >
                 {p.expanded ? 'Hide ▴' : 'View ▾'}
               </button>
@@ -110,14 +110,14 @@ export default function SearchResultCard(p: ResultProps) {
               key={t.id}
               className="flex items-center gap-2.5 py-2 border-b border-white/[0.02] last:border-b-0"
             >
-              <span className="text-xs flex-shrink-0">🎵</span>
+              <span className="text-sm flex-shrink-0">🎵</span>
               <div className="flex-1 min-w-0">
-                <div className="text-[11px] text-text-primary truncate">{t.title}</div>
-                <div className="text-[10px] text-text-muted truncate">{t.artist}</div>
+                <div className="text-[13px] text-text-primary truncate">{t.title}</div>
+                <div className="text-[12px] text-text-muted truncate">{t.artist}</div>
               </div>
               <button
                 onClick={() => p.onTrackDownload?.(t.id)}
-                className="h-[24px] px-3 bg-purple text-white rounded text-[10px] hover:bg-[#6d28d9] transition flex-shrink-0"
+                className="h-[24px] px-3 bg-purple text-white rounded text-[12px] hover:bg-[#6d28d9] transition flex-shrink-0"
               >
                 Download
               </button>

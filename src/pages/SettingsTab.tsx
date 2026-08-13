@@ -42,14 +42,14 @@ function Dropdown({ value, options, onSelect, open, onToggle }: {
       <div onClick={onToggle}
         className="px-3 py-2 bg-bg-input border border-border rounded-lg flex justify-between items-center cursor-pointer hover:border-text-muted transition-colors"
       >
-        <span className="text-sm text-text-primary">{value}</span>
-        <span className="text-xs text-purple-light">▾</span>
+        <span className="text-base text-text-primary">{value}</span>
+        <span className="text-sm text-purple-light">▾</span>
       </div>
       {open && (
         <div className="absolute z-10 mt-1 w-full bg-bg-input border border-border rounded-lg shadow-lg overflow-hidden">
           {options.map((o) => (
             <div key={o} onClick={() => { onSelect(o); onToggle() }}
-              className={`px-3 py-2 text-xs cursor-pointer hover:bg-purple-ghost transition-colors ${o === value ? 'text-purple-light' : 'text-text-secondary'}`}
+              className={`px-3 py-2 text-sm cursor-pointer hover:bg-purple-ghost transition-colors ${o === value ? 'text-purple-light' : 'text-text-secondary'}`}
             >{o}</div>
           ))}
         </div>
@@ -122,8 +122,8 @@ export default function SettingsTab() {
     window.location.reload()
   }
 
-  const sectionTitle = 'text-[10px] font-semibold text-purple-light tracking-wider mb-3.5 uppercase'
-  const sublabel = 'text-[11px] text-text-muted block mb-1'
+  const sectionTitle = 'text-[12px] font-semibold text-purple-light tracking-wider mb-3.5 uppercase'
+  const sublabel = 'text-[13px] text-text-muted block mb-1'
 
   const currentQuality = QUALITY_TIERS[qualityIdx]?.label || QUALITY_TIERS[3].label
 
@@ -137,7 +137,7 @@ export default function SettingsTab() {
           <label className={sublabel}>Base download folder</label>
           <div className="flex gap-2">
             <input value={folder} onChange={(e) => { setFolder(e.target.value); update('download_folder', e.target.value) }}
-              className="flex-1 h-9 bg-bg-input border border-border rounded-lg px-2.5 text-[11px] text-text-secondary font-mono outline-none focus:border-purple"
+              className="flex-1 h-9 bg-bg-input border border-border rounded-lg px-2.5 text-[13px] text-text-secondary font-mono outline-none focus:border-purple"
             />
             <button
               onClick={async () => {
@@ -146,7 +146,7 @@ export default function SettingsTab() {
                   if (path) { setFolder(path); update('download_folder', path) }
                 }
               }}
-              className="w-9 h-9 bg-bg-input border border-border rounded-lg flex items-center justify-center text-sm hover:border-text-muted transition flex-shrink-0">📂</button>
+              className="w-9 h-9 bg-bg-input border border-border rounded-lg flex items-center justify-center text-base hover:border-text-muted transition flex-shrink-0">📂</button>
           </div>
         </div>
 
@@ -168,7 +168,7 @@ export default function SettingsTab() {
             open={folderOpen} onToggle={() => setFolderOpen(!folderOpen)}
             onSelect={(v) => { setFolderFmt(v); update('folder_format', v) }}
           />
-          <p className="text-[9px] text-text-muted mt-1.5">
+          <p className="text-[12px] text-text-muted mt-1.5">
             Preview: <TemplatePreview template={folderFmt} type="folder" />
           </p>
         </div>
@@ -178,7 +178,7 @@ export default function SettingsTab() {
             <label className={sublabel}>File name template</label>
             <button
               onClick={() => setCustomOpen(!customOpen)}
-              className="text-[9px] text-purple-light cursor-pointer select-none hover:text-purple transition-colors"
+              className="text-[12px] text-purple-light cursor-pointer select-none hover:text-purple transition-colors"
             >
               {customOpen ? '✕ Close' : '+ Custom ▸'}
             </button>
@@ -189,43 +189,43 @@ export default function SettingsTab() {
           />
           {customOpen && (
             <div className="mt-3 p-3 bg-bg-input/50 border border-border rounded-lg animate-fade-in">
-              <p className="text-[9px] text-text-muted mb-2">TOKENS</p>
+              <p className="text-[12px] text-text-muted mb-2">TOKENS</p>
               <div className="flex gap-1.5 flex-wrap mb-3">
                 {['{track}', '{title}', '{artist}', '{album}', '{year}', '{bit_depth}'].map((t) => (
                   <button
                     key={t}
                     onClick={() => setFileFmt((fileFmt + t).replace('}{', '} {'))}
-                    className="px-2 py-0.5 bg-purple-ghost text-purple-light rounded-full text-[9px] font-medium hover:bg-purple hover:text-white transition-colors"
+                    className="px-2 py-0.5 bg-purple-ghost text-purple-light rounded-full text-[12px] font-medium hover:bg-purple hover:text-white transition-colors"
                   >{t}</button>
                 ))}
               </div>
-              <p className="text-[9px] text-text-muted mb-2">SEPARATORS</p>
+              <p className="text-[12px] text-text-muted mb-2">SEPARATORS</p>
               <div className="flex gap-1.5 flex-wrap mb-3">
                 {[' — ', '.', '/', '(', ')', ' '].map((s) => (
                   <button
                     key={s}
                     onClick={() => setFileFmt(fileFmt + s)}
-                    className="px-2 py-0.5 bg-bg-input border border-border text-text-secondary rounded-full text-[9px] hover:border-purple hover:text-purple-light transition-colors"
+                    className="px-2 py-0.5 bg-bg-input border border-border text-text-secondary rounded-full text-[12px] hover:border-purple hover:text-purple-light transition-colors"
                   >{s.trim() === '' ? '␣' : s}</button>
                 ))}
               </div>
-              <p className="text-[9px] text-text-muted mb-2">CURRENT TEMPLATE</p>
-              <div className="px-2.5 py-2 bg-bg-input border border-purple rounded-lg text-[10px] text-purple-light font-mono mb-3 min-h-[28px]">
+              <p className="text-[12px] text-text-muted mb-2">CURRENT TEMPLATE</p>
+              <div className="px-2.5 py-2 bg-bg-input border border-purple rounded-lg text-[12px] text-purple-light font-mono mb-3 min-h-[28px]">
                 {fileFmt}
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setFileFmt(fileFmt.slice(0, -1))}
-                  className="flex-1 h-7 bg-bg-input border border-border rounded text-[10px] text-text-secondary hover:border-text-muted transition-colors"
+                  className="flex-1 h-8 bg-bg-input border border-border rounded text-[12px] text-text-secondary hover:border-text-muted transition-colors"
                 >⌫ Delete Last</button>
                 <button
                   onClick={() => { update('track_format', fileFmt); setCustomOpen(false) }}
-                  className="flex-1 h-7 bg-purple text-white rounded text-[10px] font-medium hover:bg-[#6d28d9] transition-colors"
+                  className="flex-1 h-8 bg-purple text-white rounded text-[12px] font-medium hover:bg-[#6d28d9] transition-colors"
                 >✓ Save Template</button>
               </div>
             </div>
           )}
-          <p className="text-[9px] text-text-muted mt-1.5">
+          <p className="text-[12px] text-text-muted mt-1.5">
             Preview: <TemplatePreview template={fileFmt} type="file" />
           </p>
         </div>
@@ -237,8 +237,8 @@ export default function SettingsTab() {
 
         <div className="flex items-center justify-between py-2.5 border-b border-white/[0.02]">
           <div>
-            <p className="text-[11px] text-text-secondary">Embed cover in audio files</p>
-            <p className="text-[9px] text-text-muted">Write cover art into FLAC metadata</p>
+            <p className="text-[13px] text-text-secondary">Embed cover in audio files</p>
+            <p className="text-[12px] text-text-muted">Write cover art into FLAC metadata</p>
           </div>
           <Toggle enabled={embedCover} onChange={(v) => { setEmbedCover(v); update('embed_cover', v) }} />
         </div>
@@ -255,8 +255,8 @@ export default function SettingsTab() {
 
         <div className="flex items-center justify-between py-2.5 border-b border-white/[0.02]">
           <div>
-            <p className="text-[11px] text-text-muted">Save cover.jpg separately</p>
-            <p className="text-[9px] text-text-muted">Save highest-quality cover next to audio files</p>
+            <p className="text-[13px] text-text-muted">Save cover.jpg separately</p>
+            <p className="text-[12px] text-text-muted">Save highest-quality cover next to audio files</p>
           </div>
           <Toggle enabled={saveCover} onChange={(v) => { setSaveCover(v); update('save_artwork', v) }} />
         </div>
@@ -278,16 +278,16 @@ export default function SettingsTab() {
         <div className="bg-bg-card/40 border border-border rounded-xl p-3.5 flex items-center gap-2.5 mb-2.5">
           <div className="w-2.5 h-2.5 rounded-full bg-green-quality flex-shrink-0" />
           <div className="flex-1">
-            <div className="text-[11px] text-text-primary">Qobuz — Connected</div>
-            <div className="text-[10px] text-text-muted">Signed in · Ready to download</div>
+            <div className="text-[13px] text-text-primary">Qobuz — Connected</div>
+            <div className="text-[12px] text-text-muted">Signed in · Ready to download</div>
           </div>
           <button onClick={signOut}
-            className="h-7 px-3.5 border border-red-500 text-red-500 rounded text-[10px] hover:bg-red-500/10 transition flex-shrink-0"
+            className="h-8 px-3.5 border border-red-500 text-red-500 rounded text-[12px] hover:bg-red-500/10 transition flex-shrink-0"
           >Sign Out</button>
         </div>
         <div className="px-3 py-2 bg-bg-input border border-border rounded-lg flex justify-between items-center cursor-pointer hover:border-text-muted transition-colors">
-          <span className="text-sm text-text-muted">🐙 Add another Qobuz account</span>
-          <span className="text-xs text-purple-light">▾</span>
+          <span className="text-base text-text-muted">🐙 Add another Qobuz account</span>
+          <span className="text-sm text-purple-light">▾</span>
         </div>
       </section>
 
@@ -295,16 +295,16 @@ export default function SettingsTab() {
       <section>
         <h2 className={sectionTitle}>About</h2>
         <div className="flex justify-between items-center py-2 border-b border-white/[0.02]">
-          <span className="text-[11px] text-text-muted">Version</span>
-          <span className="text-[11px] text-text-secondary">0.1.0</span>
+          <span className="text-[13px] text-text-muted">Version</span>
+          <span className="text-[13px] text-text-secondary">0.1.0</span>
         </div>
         <div className="flex justify-between items-center py-2 border-b border-white/[0.02]">
-          <span className="text-[11px] text-text-muted">Check for updates</span>
-          <span className="text-[10px] text-purple-light cursor-pointer select-none">Check ▸</span>
+          <span className="text-[13px] text-text-muted">Check for updates</span>
+          <span className="text-[12px] text-purple-light cursor-pointer select-none">Check ▸</span>
         </div>
         <div className="flex justify-between items-center py-2">
-          <span className="text-[11px] text-text-muted">Licenses</span>
-          <span className="text-[10px] text-purple-light cursor-pointer select-none">View ▸</span>
+          <span className="text-[13px] text-text-muted">Licenses</span>
+          <span className="text-[12px] text-purple-light cursor-pointer select-none">View ▸</span>
         </div>
       </section>
     </div>

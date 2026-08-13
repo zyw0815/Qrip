@@ -136,7 +136,7 @@ export default function SearchTab() {
               setMode(m)
               setError('')
             }}
-            className={`flex-1 py-2.5 rounded-lg text-xs font-medium transition border ${
+            className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition border ${
               mode === m
                 ? 'bg-purple text-white border-purple'
                 : 'bg-bg-input text-text-muted border-border hover:border-text-muted'
@@ -149,7 +149,7 @@ export default function SearchTab() {
 
       {/* Input */}
       <div className="mb-4">
-        <label className="text-[10px] text-text-muted block mb-1">
+        <label className="text-[12px] text-text-muted block mb-1">
           {mode === 'url' ? 'Paste a Qobuz link' : 'Search Qobuz'}
         </label>
         <input
@@ -163,25 +163,25 @@ export default function SearchTab() {
               ? 'open.qobuz.com/album/...'
               : 'Artist, album, or track name...'
           }
-          className="w-full h-[42px] bg-bg-input border border-purple rounded-lg px-3 text-sm text-purple-light placeholder:text-text-muted outline-none transition"
+          className="w-full h-[42px] bg-bg-input border border-purple rounded-lg px-3 text-base text-purple-light placeholder:text-text-muted outline-none transition"
         />
       </div>
 
       {/* URL Mode: hint box */}
       {mode === 'url' && (
         <div className="bg-bg-card/40 border border-border rounded-lg p-4 mb-4">
-          <p className="text-[9px] text-text-muted tracking-wider mb-2 uppercase">
+          <p className="text-[12px] text-text-muted tracking-wider mb-2 uppercase">
             Supported Links
           </p>
-          <p className="text-[10px] text-text-secondary py-0.5">
+          <p className="text-[12px] text-text-secondary py-0.5">
             🎵 Track:{' '}
             <b className="text-purple-light">open.qobuz.com/track</b>/...
           </p>
-          <p className="text-[10px] text-text-secondary py-0.5">
+          <p className="text-[12px] text-text-secondary py-0.5">
             💿 Album:{' '}
             <b className="text-purple-light">open.qobuz.com/album</b>/...
           </p>
-          <p className="text-[10px] text-text-secondary py-0.5">
+          <p className="text-[12px] text-text-secondary py-0.5">
             📋 Playlist:{' '}
             <b className="text-purple-light">open.qobuz.com/playlist</b>/...
           </p>
@@ -195,7 +195,7 @@ export default function SearchTab() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`text-[10px] px-3 py-1 rounded-full transition border ${
+              className={`text-[12px] px-3 py-1 rounded-full transition border ${
                 filter === f
                   ? 'bg-purple-ghost text-purple-light border-purple'
                   : 'bg-bg-input text-text-muted border-transparent hover:border-border'
@@ -218,14 +218,14 @@ export default function SearchTab() {
         <button
           onClick={mode === 'url' ? handleResolve : handleSearch}
           disabled={loading || !input.trim()}
-          className="h-9 px-10 bg-purple text-white rounded-md text-xs font-medium hover:bg-[#6d28d9] transition disabled:opacity-50"
+          className="h-9 px-10 bg-purple text-white rounded-md text-sm font-medium hover:bg-[#6d28d9] transition disabled:opacity-50"
         >
           {loading ? 'Working...' : mode === 'url' ? 'Resolve ▸' : 'Search ▸'}
         </button>
       </div>
 
       {error && (
-        <p className="text-red-500 text-xs text-center mb-4 animate-fade-in">
+        <p className="text-red-500 text-sm text-center mb-4 animate-fade-in">
           {error}
         </p>
       )}
