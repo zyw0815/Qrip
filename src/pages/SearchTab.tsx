@@ -211,7 +211,8 @@ export default function SearchTab() {
 }
 
 function formatResult(item: Record<string, any>): Result {
-  const d = item
+  // Resolve returns {type, data}; search returns the item directly
+  const d = item.data || item
   const meta: string[] = []
   if (d.year) meta.push(String(d.year))
   if (d.tracks_count) meta.push(`${d.tracks_count} tracks`)
