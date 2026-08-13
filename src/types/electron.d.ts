@@ -5,6 +5,7 @@ export interface ElectronAPI {
   deleteStoreValue(key: string): Promise<boolean>
   onPythonStatus(cb: (status: string) => void): void
   getDownloadPath(): Promise<string>
+  pickFolder(): Promise<string | null>
 }
 
 declare global {

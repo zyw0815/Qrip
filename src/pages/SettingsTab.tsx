@@ -92,6 +92,7 @@ export default function SettingsTab() {
   const [fileOpen, setFileOpen] = useState(false)
   const [embedSizeOpen, setEmbedSizeOpen] = useState(false)
   const [savedWidthOpen, setSavedWidthOpen] = useState(false)
+  const [customOpen, setCustomOpen] = useState(false)
 
   useEffect(() => {
     fetch(`${API_BASE}/config/`)
@@ -175,12 +176,55 @@ export default function SettingsTab() {
         <div className="bg-bg-card/30 border border-border rounded-xl p-3.5">
           <div className="flex justify-between items-center mb-1">
             <label className={sublabel}>File name template</label>
-            <span className="text-[9px] text-purple-light cursor-pointer select-none">+ Custom ▸</span>
+            <button
+              onClick={() => setCustomOpen(!customOpen)}
+              className="text-[9px] text-purple-light cursor-pointer select-none hover:text-purple transition-colors"
+            >
+              {customOpen ? '✕ Close' : '+ Custom ▸'}
+            </button>
           </div>
           <Dropdown value={fileFmt} options={FILE_PRESETS}
             open={fileOpen} onToggle={() => setFileOpen(!fileOpen)}
             onSelect={(v) => { setFileFmt(v); update('track_format', v) }}
           />
+          {customOpen && (
+            <div className="mt-3 p-3 bg-bg-input/50 border border-border rounded-lg animate-fade-in">
+              <p className="text-[9px] text-text-muted mb-2">TOKENS</p>
+              <div className="flex gap-1.5 flex-wrap mb-3">
+                {['{track}', '{title}', '{artist}', '{album}', '{year}', '{bit_depth}'].map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setFileFmt((fileFmt + t).replace('}{', '} {'))}
+                    className="px-2 py-0.5 bg-purple-ghost text-purple-light rounded-full text-[9px] font-medium hover:bg-purple hover:text-white transition-colors"
+                  >{t}</button>
+                ))}
+              </div>
+              <p className="text-[9px] text-text-muted mb-2">SEPARATORS</p>
+              <div className="flex gap-1.5 flex-wrap mb-3">
+                {[' — ', '.', '/', '(', ')', ' '].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setFileFmt(fileFmt + s)}
+                    className="px-2 py-0.5 bg-bg-input border border-border text-text-secondary rounded-full text-[9px] hover:border-purple hover:text-purple-light transition-colors"
+                  >{s.trim() === '' ? '␣' : s}</button>
+                ))}
+              </div>
+              <p className="text-[9px] text-text-muted mb-2">CURRENT TEMPLATE</p>
+              <div className="px-2.5 py-2 bg-bg-input border border-purple rounded-lg text-[10px] text-purple-light font-mono mb-3 min-h-[28px]">
+                {fileFmt}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setFileFmt(fileFmt.slice(0, -1))}
+                  className="flex-1 h-7 bg-bg-input border border-border rounded text-[10px] text-text-secondary hover:border-text-muted transition-colors"
+                >⌫ Delete Last</button>
+                <button
+                  onClick={() => { update('track_format', fileFmt); setCustomOpen(false) }}
+                  className="flex-1 h-7 bg-purple text-white rounded text-[10px] font-medium hover:bg-[#6d28d9] transition-colors"
+                >✓ Save Template</button>
+              </div>
+            </div>
+          )}
           <p className="text-[9px] text-text-muted mt-1.5">
             Preview: <TemplatePreview template={fileFmt} type="file" />
           </p>
