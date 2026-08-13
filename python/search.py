@@ -71,13 +71,16 @@ async def search(req: SearchRequest):
     await client.login()
     resp = await client.search(req.media_type, req.query, limit=20)
 
-    if isinstance(resp, dict):
-        key = req.media_type + "s"
+    # client.search() returns a list of PAGE dicts, each shaped like
+    # {"albums": {"items": [...], "total": N, ...}}
+    key = req.media_type + "s"
+    items = []
+    if isinstance(resp, list):
+        for page in resp:
+            if isinstance(page, dict):
+                items.extend(page.get(key, {}).get("items", []))
+    elif isinstance(resp, dict):
         items = resp.get(key, {}).get("items", [])
-    elif isinstance(resp, list):
-        items = resp
-    else:
-        items = []
 
     results = [item_to_dict(item, req.media_type) for item in items]
     return {"results": results}
