@@ -1,0 +1,64 @@
+{
+  "name": "qrip",
+  "version": "0.1.0",
+  "description": "Desktop GUI for downloading music from Qobuz",
+  "main": "dist-electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "build:electron": "tsc electron/main.ts electron/preload.ts --outDir dist-electron --module commonjs --target ES2020 --moduleResolution node --skipLibCheck --esModuleInterop && node scripts/fix-preload-path.cjs",
+    "electron:dev": "npm run build:electron && concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "electron:build": "npm run build:electron && vite build && electron-builder",
+    "build:backend": "cd python && pyinstaller --onefile --name qrip-server --add-data \"../streamrip/config.toml:streamrip\" --paths . --paths .. server.py"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "lucide-react": "^0.400.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "concurrently": "^8.2.2",
+    "cross-env": "^10.1.0",
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.qrip.app",
+    "productName": "Qrip",
+    "icon": "img/icon.png",
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.music"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "files": [
+      "dist/index.html",
+      "dist/assets/**/*",
+      "dist-electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "python/dist/qrip-server",
+        "to": "backend/qrip-server"
+      }
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "publish": null
+  }
+}
