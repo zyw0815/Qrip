@@ -296,11 +296,21 @@ export default function SettingsTab() {
         </div>
         <div className="flex justify-between items-center py-2 border-b border-white/[0.02]">
           <span className="text-sm text-text-muted">Check for updates</span>
-          <span className="text-[13px] text-purple-light cursor-pointer select-none">Check ▸</span>
+          <span
+            className="text-[13px] text-purple-light cursor-pointer select-none hover:text-text-primary transition"
+            onClick={() => window.electronAPI?.openExternal('https://github.com/zyw0815/Qrip')}
+          >
+            Check ▸
+          </span>
         </div>
         <div className="flex justify-between items-center py-2">
-          <span className="text-sm text-text-muted">Licenses</span>
-          <span className="text-[13px] text-purple-light cursor-pointer select-none">View ▸</span>
+          <span className="text-sm text-text-muted">Author</span>
+          <span
+            className="text-[13px] text-purple-light cursor-pointer select-none hover:text-text-primary transition"
+            onClick={() => window.electronAPI?.openExternal('https://github.com/zyw0815')}
+          >
+            zyw0815 ▸
+          </span>
         </div>
       </section>
     </div>

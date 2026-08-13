@@ -6,6 +6,7 @@ export interface ElectronAPI {
   onPythonStatus(cb: (status: string) => void): void
   getDownloadPath(): Promise<string>
   pickFolder(): Promise<string | null>
+  openExternal(url: string): Promise<void>
 }
 
 declare global {

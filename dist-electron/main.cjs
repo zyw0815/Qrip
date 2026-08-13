@@ -158,6 +158,12 @@ electron_1.ipcMain.handle('dialog:pick-folder', async () => {
     });
     return result.canceled ? null : result.filePaths[0];
 });
+electron_1.ipcMain.handle('open-external', async (_e, url) => {
+    // Only allow http/https links — anything else is refused.
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url))
+        return;
+    await electron_1.shell.openExternal(url);
+});
 electron_1.app.whenReady().then(() => {
     startPython();
     createWindow();

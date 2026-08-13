@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'
 import path from 'path'
 import Store from 'electron-store'
@@ -164,6 +164,12 @@ ipcMain.handle('dialog:pick-folder', async () => {
     defaultPath: app.getPath('music'),
   })
   return result.canceled ? null : result.filePaths[0]
+})
+
+ipcMain.handle('open-external', async (_e, url: string) => {
+  // Only allow http/https links — anything else is refused.
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return
+  await shell.openExternal(url)
 })
 
 app.whenReady().then(() => {
