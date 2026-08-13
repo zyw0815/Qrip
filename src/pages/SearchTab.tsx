@@ -17,11 +17,19 @@ interface Result {
 
 export default function SearchTab() {
   const [mode, setMode] = useState<Mode>('url')
-  const [input, setInput] = useState('')
+  // Separate state per mode — switching modes preserves both sides
+  const [urlInput, setUrlInput] = useState('')
+  const [urlResults, setUrlResults] = useState<Result[]>([])
+  const [searchInput, setSearchInput] = useState('')
+  const [searchResults, setSearchResults] = useState<Result[]>([])
   const [filter, setFilter] = useState<FilterType>('all')
-  const [results, setResults] = useState<Result[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const input = mode === 'url' ? urlInput : searchInput
+  const results = mode === 'url' ? urlResults : searchResults
+  const setInput = mode === 'url' ? setUrlInput : setSearchInput
+  const setResults = mode === 'url' ? setUrlResults : setSearchResults
 
   const handleResolve = async () => {
     if (!input.trim()) return
@@ -89,9 +97,7 @@ export default function SearchTab() {
             key={m}
             onClick={() => {
               setMode(m)
-              setResults([])
               setError('')
-              setInput('')
             }}
             className={`flex-1 py-2.5 rounded-lg text-xs font-medium transition border ${
               mode === m
