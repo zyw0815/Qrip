@@ -36,6 +36,11 @@ body {
   background: #2a2a40;
 }
 
+.scroll-stable {
+  scrollbar-gutter: stable;
+  overflow-y: auto;
+}
+
 @keyframes fadeSlideIn {
   from {
     opacity: 0;
