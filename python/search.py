@@ -96,6 +96,33 @@ async def search(req: SearchRequest):
     return {"results": results}
 
 
+@router.get("/tracks/{item_id}")
+async def get_album_tracks(item_id: str):
+    """Fetch the track list for an album or playlist."""
+    cfg = get_config()
+    client = QobuzClient(cfg)
+    await client.login()
+    try:
+        resp = await client.get_metadata(item_id, "album")
+    except Exception:
+        try:
+            resp = await client.get_metadata(item_id, "playlist")
+        except Exception as e:
+            raise HTTPException(500, str(e))
+
+    tracks = []
+    items = resp.get("tracks", {}).get("items", []) if isinstance(resp.get("tracks"), dict) else resp.get("tracks", [])
+    for t in items:
+        performer = t.get("performer", {}) or {}
+        artist_name = performer.get("name") or "Unknown"
+        tracks.append({
+            "id": str(t.get("id", "")),
+            "title": t.get("title", "Unknown"),
+            "artist": artist_name,
+        })
+    return {"tracks": tracks}
+
+
 @router.post("/resolve")
 async def resolve(req: ResolveRequest):
     """Parse a Qobuz URL and return metadata."""

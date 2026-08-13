@@ -81,6 +81,8 @@ export default function SearchTab() {
   }
 
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [trackLists, setTrackLists] = useState<Map<string, { id: string; title: string; artist: string; added: boolean }[]>>(new Map())
 
   const addToQueue = async (result: Result) => {
     try {
@@ -94,6 +96,32 @@ export default function SearchTab() {
       }
     } catch {
       setError('Failed to add to download queue')
+    }
+  }
+
+  const toggleView = async (result: Result) => {
+    if (expandedIds.has(result.id)) {
+      setExpandedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(result.id)
+        return next
+      })
+      return
+    }
+    // Fetch track list
+    try {
+      const r = await fetch(`${API_BASE}/search/tracks/${result.id}`)
+      if (r.ok) {
+        const data = await r.json()
+        const tracks = (data.tracks || []).map((t: { id: string; title: string; artist: string }) => ({
+          ...t,
+          added: addedIds.has(t.id),
+        }))
+        setTrackLists((prev) => new Map(prev).set(result.id, tracks))
+        setExpandedIds((prev) => new Set(prev).add(result.id))
+      }
+    } catch {
+      setError('Failed to load tracks')
     }
   }
 
@@ -210,9 +238,13 @@ export default function SearchTab() {
             {...r}
             selected={i === 0}
             added={addedIds.has(r.id)}
+            expanded={expandedIds.has(r.id)}
+            tracks={trackLists.get(r.id)}
             onDownload={() => addToQueue(r)}
-            onAdd={r.type === 'track' ? () => addToQueue(r) : undefined}
-            onView={() => {}} // expand tracks - for V1 refinement
+            onView={() => toggleView(r)}
+            onTrackDownload={(trackId) =>
+              addToQueue({ id: trackId, type: 'track', title: '', artist: '', meta: [], qualityTags: [] })
+            }
           />
         ))}
       </div>
