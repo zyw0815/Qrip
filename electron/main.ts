@@ -66,34 +66,52 @@ function createWindow() {
 ipcMain.handle('open-oauth', async (_e, url: string) => {
   return new Promise<string | null>((resolve) => {
     const authWin = new BrowserWindow({
-      width: 800,
-      height: 700,
+      width: 1200,
+      height: 800,
       title: 'Qrip — Google Login',
     })
     authWin.loadURL(url)
 
-    const handleNavigation = (navUrl: string) => {
-      try {
-        const parsed = new URL(navUrl)
-        if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
-          const token = parsed.searchParams.get('token')
-          if (token) {
-            authWin.removeAllListeners()
-            authWin.close()
-            resolve(token)
-          }
-        }
-      } catch {
-        // not a valid URL, ignore
-      }
+    let resolved = false
+    const finish = (token: string | null) => {
+      if (resolved) return
+      resolved = true
+      authWin.removeAllListeners()
+      if (!authWin.isDestroyed()) authWin.close()
+      resolve(token)
     }
 
-    authWin.webContents.on('will-redirect', (_ev, navUrl) => handleNavigation(navUrl))
-    authWin.webContents.on('will-navigate', (_ev, navUrl) => handleNavigation(navUrl))
-    authWin.on('closed', () => {
-      authWin.removeAllListeners()
-      resolve(null)
+    // Qobuz stores user_auth_token in localStorage after successful login.
+    // Poll for it once the page finishes loading.
+    authWin.webContents.on('did-finish-load', async () => {
+      const currentUrl = authWin.webContents.getURL()
+      // Only extract when we're on the Qobuz player domain (login finished)
+      if (!currentUrl.includes('play.qobuz.com') && !currentUrl.includes('qobuz.com')) return
+
+      try {
+        const result = await authWin.webContents.executeJavaScript(
+          `(() => {
+            let token = ''
+            let userId = ''
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i) || ''
+              const val = localStorage.getItem(key) || ''
+              if (key.toLowerCase().includes('auth_token') && val.length > 10) token = val
+              if (!userId && key.toLowerCase().includes('user') && key.toLowerCase().includes('id') && val && val.length > 0) userId = val
+            }
+            return JSON.stringify({ token, userId })
+          })()`,
+        )
+        const { token, userId } = JSON.parse(result)
+        if (token && typeof token === 'string' && token.length > 10 && userId) {
+          finish(JSON.stringify({ token, userId }))
+        }
+      } catch {
+        // ignore — try again on next load
+      }
     })
+
+    authWin.on('closed', () => finish(null))
   })
 })
 

@@ -25,6 +25,11 @@ class TokenLoginRequest(BaseModel):
     token: str
 
 
+class GoogleLoginRequest(BaseModel):
+    user_id: str
+    token: str
+
+
 def get_config() -> Config:
     global _config
     if _config is None:
@@ -77,11 +82,12 @@ async def login_token(req: TokenLoginRequest):
 
 
 @router.post("/login/google")
-async def login_with_token(token: str):
-    """Called by Electron after OAuth flow captures the token."""
+async def login_google(req: GoogleLoginRequest):
+    """Called by Electron after OAuth flow captures token + user_id from localStorage."""
     global _logged_in
     cfg = get_config()
-    cfg.session.qobuz.password_or_token = token
+    cfg.session.qobuz.email_or_userid = req.user_id
+    cfg.session.qobuz.password_or_token = req.token
     cfg.session.qobuz.use_auth_token = True
 
     from streamrip.client.qobuz import QobuzClient

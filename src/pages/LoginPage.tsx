@@ -19,16 +19,27 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
       return
     }
     try {
-      const capturedToken = await window.electronAPI?.openOAuth(
+      const captured = await window.electronAPI?.openOAuth(
         'https://play.qobuz.com/login?open-oauth=google',
       )
-      if (capturedToken) {
+      if (captured) {
         setLoading(true)
         setError('')
-        const r = await fetch(
-          `${API_BASE}/auth/login/google?token=${encodeURIComponent(capturedToken)}`,
-          { method: 'POST' },
-        )
+        let userId = ''
+        let token = ''
+        try {
+          const parsed = JSON.parse(captured)
+          userId = parsed.userId || ''
+          token = parsed.token || ''
+        } catch {
+          // Old format: raw token string
+          token = captured
+        }
+        const r = await fetch(`${API_BASE}/auth/login/google`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, token }),
+        })
         if (r.ok) onAuthSuccess()
         else {
           const data = await r.json()

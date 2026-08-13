@@ -45,7 +45,7 @@ function createWindow() {
         titleBarStyle: 'hiddenInset',
         title: 'Qrip',
         webPreferences: {
-            preload: path_1.default.join(__dirname, 'preload.cjs'),
+            preload: path_1.default.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
         },
@@ -62,33 +62,50 @@ function createWindow() {
 electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
     return new Promise((resolve) => {
         const authWin = new electron_1.BrowserWindow({
-            width: 800,
-            height: 700,
+            width: 1200,
+            height: 800,
             title: 'Qrip — Google Login',
         });
         authWin.loadURL(url);
-        const handleNavigation = (navUrl) => {
+        let resolved = false;
+        const finish = (token) => {
+            if (resolved)
+                return;
+            resolved = true;
+            authWin.removeAllListeners();
+            if (!authWin.isDestroyed())
+                authWin.close();
+            resolve(token);
+        };
+        // Qobuz stores user_auth_token in localStorage after successful login.
+        // Poll for it once the page finishes loading.
+        authWin.webContents.on('did-finish-load', async () => {
+            const currentUrl = authWin.webContents.getURL();
+            // Only extract when we're on the Qobuz player domain (login finished)
+            if (!currentUrl.includes('play.qobuz.com') && !currentUrl.includes('qobuz.com'))
+                return;
             try {
-                const parsed = new URL(navUrl);
-                if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
-                    const token = parsed.searchParams.get('token');
-                    if (token) {
-                        authWin.removeAllListeners();
-                        authWin.close();
-                        resolve(token);
-                    }
+                const result = await authWin.webContents.executeJavaScript(`(() => {
+            let token = ''
+            let userId = ''
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i) || ''
+              const val = localStorage.getItem(key) || ''
+              if (key.toLowerCase().includes('auth_token') && val.length > 10) token = val
+              if (!userId && key.toLowerCase().includes('user') && key.toLowerCase().includes('id') && val && val.length > 0) userId = val
+            }
+            return JSON.stringify({ token, userId })
+          })()`);
+                const { token, userId } = JSON.parse(result);
+                if (token && typeof token === 'string' && token.length > 10 && userId) {
+                    finish(JSON.stringify({ token, userId }));
                 }
             }
             catch {
-                // not a valid URL, ignore
+                // ignore — try again on next load
             }
-        };
-        authWin.webContents.on('will-redirect', (_ev, navUrl) => handleNavigation(navUrl));
-        authWin.webContents.on('will-navigate', (_ev, navUrl) => handleNavigation(navUrl));
-        authWin.on('closed', () => {
-            authWin.removeAllListeners();
-            resolve(null);
         });
+        authWin.on('closed', () => finish(null));
     });
 });
 electron_1.ipcMain.handle('store:get', (_e, key) => store.get(key));
