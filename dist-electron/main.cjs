@@ -81,11 +81,17 @@ electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
         // Poll for it once the page finishes loading.
         authWin.webContents.on('did-finish-load', async () => {
             const currentUrl = authWin.webContents.getURL();
+            console.log(`[oauth] page loaded: ${currentUrl}`);
             // Only extract when we're on the Qobuz player domain (login finished)
             if (!currentUrl.includes('play.qobuz.com') && !currentUrl.includes('qobuz.com'))
                 return;
             try {
                 const result = await authWin.webContents.executeJavaScript(`(() => {
+            const keys = []
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i) || ''
+              keys.push(key + '=' + (localStorage.getItem(key) || '').slice(0, 30) + '...')
+            }
             let token = ''
             let userId = ''
             for (let i = 0; i < localStorage.length; i++) {
@@ -94,15 +100,17 @@ electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
               if (key.toLowerCase().includes('auth_token') && val.length > 10) token = val
               if (!userId && key.toLowerCase().includes('user') && key.toLowerCase().includes('id') && val && val.length > 0) userId = val
             }
-            return JSON.stringify({ token, userId })
+            return JSON.stringify({ token, userId, keys })
           })()`);
-                const { token, userId } = JSON.parse(result);
-                if (token && typeof token === 'string' && token.length > 10 && userId) {
-                    finish(JSON.stringify({ token, userId }));
+                const parsed = JSON.parse(result);
+                console.log(`[oauth] localStorage scan: ${parsed.keys.join(' | ')}`);
+                console.log(`[oauth] token found: ${parsed.token ? 'YES (' + parsed.token.length + ' chars)' : 'no'}, userId: ${parsed.userId || 'no'}`);
+                if (parsed.token && typeof parsed.token === 'string' && parsed.token.length > 10 && parsed.userId) {
+                    finish(JSON.stringify({ token: parsed.token, userId: parsed.userId }));
                 }
             }
-            catch {
-                // ignore — try again on next load
+            catch (err) {
+                console.log(`[oauth] scan error: ${err}`);
             }
         });
         authWin.on('closed', () => finish(null));
