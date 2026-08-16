@@ -175,7 +175,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'set.fileNameTemplate': '文件名模板',
     'set.customOpen': '+ 自定义 ▸',
     'set.customClose': '✕ 关闭',
-    'set.tokens': 'TOKENS',
+    'set.tokens': '占位符',
     'set.separators': '分隔符',
     'set.currentTemplate': '当前模板',
     'set.deleteLast': '⌫ 删除末位',

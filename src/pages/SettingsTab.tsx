@@ -24,6 +24,30 @@ const QUALITY_TIERS = [
 const EMBED_SIZES = ["Thumbnail (≈250×250)", "Small (≈600×600)", "Large (≈1400×1400)", "Original"]
 const SAVED_WIDTHS = ["250", "600", "1400", "Original (no resize)"]
 
+// Template tokens are the wire format (English) — in Chinese mode the UI
+// shows localized token names but stores/sends the English originals.
+const TOKEN_ZH: Record<string, string> = {
+  '{track}': '{音轨}',
+  '{title}': '{歌名}',
+  '{artist}': '{歌手}',
+  '{album}': '{专辑}',
+  '{year}': '{年份}',
+  '{bit_depth}': '{位深}',
+}
+const TOKEN_ZH_REVERSE: Record<string, string> = Object.fromEntries(
+  Object.entries(TOKEN_ZH).map(([en, zh]) => [zh, en]),
+)
+
+function templateToDisplay(template: string, lang: 'en' | 'zh'): string {
+  if (lang === 'en') return template
+  return template.replace(/\{(track|title|artist|album|year|bit_depth)\}/g, (m) => TOKEN_ZH[m] ?? m)
+}
+
+function displayToTemplate(display: string, lang: 'en' | 'zh'): string {
+  if (lang === 'en') return display
+  return display.replace(/\{[^}]+\}/g, (m) => TOKEN_ZH_REVERSE[m] ?? m)
+}
+
 function Dropdown({ value, options, onSelect, open, onToggle }: {
   value: string
   options: string[]
@@ -181,9 +205,15 @@ export default function SettingsTab() {
 
         <div className="mb-3.5 bg-bg-card/30 border border-border rounded-xl p-3.5">
           <label className={sublabel}>{t('set.folderStruct')}</label>
-          <Dropdown value={folderFmt} options={FOLDER_PRESETS}
+          <Dropdown
+            value={templateToDisplay(folderFmt, lang)}
+            options={FOLDER_PRESETS.map((p) => templateToDisplay(p, lang))}
             open={folderOpen} onToggle={() => setFolderOpen(!folderOpen)}
-            onSelect={(v) => { setFolderFmt(v); update('folder_format', v) }}
+            onSelect={(v) => {
+              const real = displayToTemplate(v, lang)
+              setFolderFmt(real)
+              update('folder_format', real)
+            }}
           />
           <p className="text-[13px] text-text-muted mt-1.5">
             {t('set.preview')} <TemplatePreview template={folderFmt} type="folder" />
@@ -200,9 +230,15 @@ export default function SettingsTab() {
               {customOpen ? t('set.customClose') : t('set.customOpen')}
             </button>
           </div>
-          <Dropdown value={fileFmt} options={FILE_PRESETS}
+          <Dropdown
+            value={templateToDisplay(fileFmt, lang)}
+            options={FILE_PRESETS.map((p) => templateToDisplay(p, lang))}
             open={fileOpen} onToggle={() => setFileOpen(!fileOpen)}
-            onSelect={(v) => { setFileFmt(v); update('track_format', v) }}
+            onSelect={(v) => {
+              const real = displayToTemplate(v, lang)
+              setFileFmt(real)
+              update('track_format', real)
+            }}
           />
           {customOpen && (
             <div className="mt-3 p-3 bg-bg-input/50 border border-border rounded-lg animate-fade-in">
@@ -213,7 +249,7 @@ export default function SettingsTab() {
                     key={tk}
                     onClick={() => setFileFmt((fileFmt + tk).replace('}{', '} {'))}
                     className="px-2 py-0.5 bg-purple-ghost text-purple-light rounded-full text-[13px] font-medium hover:bg-purple hover:text-white transition-colors"
-                  >{tk}</button>
+                  >{templateToDisplay(tk, lang)}</button>
                 ))}
               </div>
               <p className="text-[13px] text-text-muted mb-2">{t('set.separators')}</p>
@@ -228,7 +264,7 @@ export default function SettingsTab() {
               </div>
               <p className="text-[13px] text-text-muted mb-2">{t('set.currentTemplate')}</p>
               <div className="px-2.5 py-2 bg-bg-input border border-purple rounded-lg text-[13px] text-purple-light font-mono mb-3 min-h-[28px]">
-                {fileFmt}
+                {templateToDisplay(fileFmt, lang)}
               </div>
               <div className="flex gap-2">
                 <button
