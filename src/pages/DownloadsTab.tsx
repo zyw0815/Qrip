@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import ProgressBar from '../components/ProgressBar'
 import { API_BASE } from '../App'
+import { useI18n } from '../i18n'
 
 interface DownloadItem {
   item_id: string
@@ -14,6 +15,7 @@ interface DownloadItem {
 }
 
 export default function DownloadsTab() {
+  const { t } = useI18n()
   const [downloading, setDownloading] = useState<DownloadItem[]>([])
   const [queued, setQueued] = useState<DownloadItem[]>([])
 
@@ -48,9 +50,9 @@ export default function DownloadsTab() {
       <div className="p-5 animate-fade-in h-full">
         <div className="text-center py-24">
           <p className="text-5xl mb-5 opacity-40">⬇</p>
-          <p className="text-text-muted text-lg font-medium">No downloads yet</p>
+          <p className="text-text-muted text-lg font-medium">{t('dl.empty')}</p>
           <p className="text-text-muted/50 text-base mt-2">
-            Search for music or paste a URL to get started
+            {t('dl.emptyHint')}
           </p>
         </div>
       </div>
@@ -63,7 +65,7 @@ export default function DownloadsTab() {
       {downloading.length > 0 && (
         <>
           <p className="text-base text-text-muted tracking-wider mb-2.5 font-semibold uppercase">
-            Downloading — {downloading.length} active
+            {t('dl.downloading', { n: downloading.length })}
           </p>
           {downloading.map((d) => (
             <div
@@ -83,20 +85,20 @@ export default function DownloadsTab() {
               />
               <div className="flex justify-between mt-2.5 items-center">
                 <span className="text-base text-text-muted">
-                  {d.paused ? '⏸ Paused' : `${d.speed} MB/s`}
+                  {d.paused ? t('dl.pausedLabel') : `${d.speed} MB/s`}
                 </span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => (d.paused ? resume(d.item_id) : pause(d.item_id))}
                     className="h-9 px-3.5 bg-bg-input border border-border rounded-md text-base text-text-secondary hover:border-purple hover:text-purple-light transition select-none"
                   >
-                    {d.paused ? '▶ Resume' : '⏸ Pause'}
+                    {d.paused ? t('dl.resume') : t('dl.pause')}
                   </button>
                   <button
                     onClick={() => cancel(d.item_id)}
                     className="h-9 px-3.5 bg-bg-input border border-border rounded-md text-base text-text-secondary hover:border-red-500 hover:text-red-400 transition select-none"
                   >
-                    ✕ Delete
+                    {t('dl.delete')}
                   </button>
                 </div>
               </div>
@@ -109,7 +111,7 @@ export default function DownloadsTab() {
       {queued.length > 0 && (
         <>
           <p className="text-base text-text-muted tracking-wider mb-2.5 mt-5 font-semibold uppercase">
-            Queued
+            {t('dl.queued')}
           </p>
           {queued.map((q, i) => (
             <div
@@ -128,7 +130,7 @@ export default function DownloadsTab() {
                 onClick={() => cancel(q.item_id)}
                 className="h-9 px-3 bg-bg-input border border-border rounded-md text-base text-text-secondary hover:border-red-500 hover:text-red-400 transition flex-shrink-0"
               >
-                ✕ Delete
+                {t('dl.delete')}
               </button>
             </div>
           ))}

@@ -3,15 +3,17 @@ import TabBar, { type Tab } from '../components/TabBar'
 import SearchTab from './SearchTab'
 import DownloadsTab from './DownloadsTab'
 import SettingsTab from './SettingsTab'
-
-const TABS: Tab[] = [
-  { key: 'search', label: 'Search' },
-  { key: 'downloads', label: 'Downloads' },
-  { key: 'settings', label: 'Settings' },
-]
+import { useI18n } from '../i18n'
 
 export default function MainLayout() {
   const [activeTab, setActiveTab] = useState('search')
+  const { t } = useI18n()
+
+  const TABS: Tab[] = [
+    { key: 'search', label: t('tab.search') },
+    { key: 'downloads', label: t('tab.downloads') },
+    { key: 'settings', label: t('tab.settings') },
+  ]
 
   const bgStyle = {
     backgroundImage:

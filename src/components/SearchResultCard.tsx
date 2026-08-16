@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import QualityBadge from './QualityBadge'
+import { useI18n } from '../i18n'
 
 export interface ResultProps {
   cover?: string
@@ -30,6 +31,7 @@ const coverIcons: Record<string, string> = {
 }
 
 export default function SearchResultCard(p: ResultProps) {
+  const { t } = useI18n()
   return (
     <div
       className={`border rounded-xl transition-colors animate-fade-in ${
@@ -88,14 +90,14 @@ export default function SearchResultCard(p: ResultProps) {
               onClick={p.onDownload}
               className="h-[38px] px-4 bg-purple text-white rounded-md text-sm font-medium hover:bg-[#6d28d9] transition"
             >
-              Download
+              {t('card.download')}
             </button>
             {(p.type === 'album' || p.type === 'playlist') && p.onView && (
               <button
                 onClick={p.onView}
                 className="h-[38px] px-4 bg-bg-input text-text-secondary border border-border rounded-md text-sm hover:border-text-muted transition"
               >
-                {p.expanded ? 'Hide ▴' : 'View ▾'}
+                {p.expanded ? t('card.hide') : t('card.view')}
               </button>
             )}
           </div>
@@ -105,21 +107,21 @@ export default function SearchResultCard(p: ResultProps) {
       {/* Expanded track list */}
       {p.expanded && p.tracks && (
         <div className="border-t border-border px-3.5 py-2 animate-fade-in">
-          {p.tracks.map((t) => (
+          {p.tracks.map((track) => (
             <div
-              key={t.id}
+              key={track.id}
               className="flex items-center gap-2.5 py-2 border-b border-white/[0.02] last:border-b-0"
             >
               <span className="text-base flex-shrink-0">🎵</span>
               <div className="flex-1 min-w-0">
-                <div className="text-sm text-text-primary truncate">{t.title}</div>
-                <div className="text-[13px] text-text-muted truncate">{t.artist}</div>
+                <div className="text-sm text-text-primary truncate">{track.title}</div>
+                <div className="text-[13px] text-text-muted truncate">{track.artist}</div>
               </div>
               <button
-                onClick={() => p.onTrackDownload?.(t.id)}
+                onClick={() => p.onTrackDownload?.(track.id)}
                 className="h-[24px] px-3 bg-purple text-white rounded text-[13px] hover:bg-[#6d28d9] transition flex-shrink-0"
               >
-                Download
+                {t('card.download')}
               </button>
             </div>
           ))}

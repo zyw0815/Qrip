@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Toggle from '../components/Toggle'
 import { API_BASE } from '../App'
+import { useI18n } from '../i18n'
 
 const FOLDER_PRESETS = [
   "{artist} — {album} ({year})",
@@ -22,6 +23,39 @@ const QUALITY_TIERS = [
 ]
 const EMBED_SIZES = ["Thumbnail (≈250×250)", "Small (≈600×600)", "Large (≈1400×1400)", "Original"]
 const SAVED_WIDTHS = ["250", "600", "1400", "Original (no resize)"]
+
+// Template tokens are the wire format (English) — in Chinese mode the UI
+// shows localized token names but stores/sends the English originals.
+const TOKEN_ZH: Record<string, string> = {
+  '{track}': '{音轨}',
+  '{title}': '{歌名}',
+  '{artist}': '{歌手}',
+  '{album}': '{专辑}',
+  '{year}': '{年份}',
+  '{bit_depth}': '{位深}',
+}
+const TOKEN_ZH_REVERSE: Record<string, string> = Object.fromEntries(
+  Object.entries(TOKEN_ZH).map(([en, zh]) => [zh, en]),
+)
+
+function templateToDisplay(template: string, lang: 'en' | 'zh'): string {
+  if (lang === 'en') return template
+  return template.replace(/\{(track|title|artist|album|year|bit_depth)\}/g, (m) => TOKEN_ZH[m] ?? m)
+}
+
+function displayToTemplate(display: string, lang: 'en' | 'zh'): string {
+  if (lang === 'en') return display
+  return display.replace(/\{[^}]+\}/g, (m) => TOKEN_ZH_REVERSE[m] ?? m)
+}
+
+// Split a template into units (a {token} or a separator chunk) and drop
+// the last one — deletes whole tokens instead of one character at a time.
+function deleteLastUnit(template: string): string {
+  const parts = template.split(/(\{[^}]*\})/).filter(Boolean)
+  if (parts.length === 0) return ''
+  parts.pop()
+  return parts.join('')
+}
 
 function Dropdown({ value, options, onSelect, open, onToggle }: {
   value: string
@@ -77,6 +111,7 @@ function TemplatePreview({ template, type }: { template: string; type: 'folder' 
 }
 
 export default function SettingsTab() {
+  const { t, lang, setLang } = useI18n()
   const [folder, setFolder] = useState('~/Music/Qrip')
   const [qualityIdx, setQualityIdx] = useState(3)
   const [folderFmt, setFolderFmt] = useState(FOLDER_PRESETS[0])
@@ -93,6 +128,11 @@ export default function SettingsTab() {
   const [embedSizeOpen, setEmbedSizeOpen] = useState(false)
   const [savedWidthOpen, setSavedWidthOpen] = useState(false)
   const [customOpen, setCustomOpen] = useState(false)
+  const [langOpen, setLangOpen] = useState(false)
+  const [templateError, setTemplateError] = useState(false)
+  // Snapshot of the template before the custom editor opened —
+  // closing discards the edit and restores it.
+  const [editorSnapshot, setEditorSnapshot] = useState(FILE_PRESETS[0])
 
   useEffect(() => {
     fetch(`${API_BASE}/config/`)
@@ -129,12 +169,26 @@ export default function SettingsTab() {
 
   return (
     <div className="p-5 animate-fade-in h-full">
+      {/* GENERAL */}
+      <section className="mb-7">
+        <h2 className={sectionTitle}>{t('set.general')}</h2>
+        <div className="mb-3">
+          <label className={sublabel}>{t('set.language')}</label>
+          <Dropdown
+            value={lang === 'zh' ? '中文' : 'English'}
+            options={['English', '中文']}
+            open={langOpen} onToggle={() => setLangOpen(!langOpen)}
+            onSelect={(v) => setLang(v === '中文' ? 'zh' : 'en')}
+          />
+        </div>
+      </section>
+
       {/* DOWNLOAD */}
       <section className="mb-7">
-        <h2 className={sectionTitle}>Download</h2>
+        <h2 className={sectionTitle}>{t('set.download')}</h2>
 
         <div className="mb-3">
-          <label className={sublabel}>Base download folder</label>
+          <label className={sublabel}>{t('set.baseFolder')}</label>
           <div className="flex gap-2">
             <input value={folder} onChange={(e) => { setFolder(e.target.value); update('download_folder', e.target.value) }}
               className="flex-1 h-10 bg-bg-input border border-border rounded-lg px-2.5 text-sm text-text-secondary font-mono outline-none focus:border-purple"
@@ -151,7 +205,7 @@ export default function SettingsTab() {
         </div>
 
         <div className="mb-3">
-          <label className={sublabel}>Audio quality</label>
+          <label className={sublabel}>{t('set.quality')}</label>
           <Dropdown value={currentQuality} options={QUALITY_TIERS.map((t) => t.label)}
             open={qualityOpen} onToggle={() => setQualityOpen(!qualityOpen)}
             onSelect={(v) => {
@@ -163,43 +217,69 @@ export default function SettingsTab() {
         </div>
 
         <div className="mb-3.5 bg-bg-card/30 border border-border rounded-xl p-3.5">
-          <label className={sublabel}>Folder structure</label>
-          <Dropdown value={folderFmt} options={FOLDER_PRESETS}
+          <label className={sublabel}>{t('set.folderStruct')}</label>
+          <Dropdown
+            value={templateToDisplay(folderFmt, lang)}
+            options={FOLDER_PRESETS.map((p) => templateToDisplay(p, lang))}
             open={folderOpen} onToggle={() => setFolderOpen(!folderOpen)}
-            onSelect={(v) => { setFolderFmt(v); update('folder_format', v) }}
+            onSelect={(v) => {
+              const real = displayToTemplate(v, lang)
+              setFolderFmt(real)
+              update('folder_format', real)
+            }}
           />
           <p className="text-[13px] text-text-muted mt-1.5">
-            Preview: <TemplatePreview template={folderFmt} type="folder" />
+            {t('set.preview')} <TemplatePreview template={folderFmt} type="folder" />
           </p>
         </div>
 
         <div className="bg-bg-card/30 border border-border rounded-xl p-3.5">
           <div className="flex justify-between items-center mb-1">
-            <label className={sublabel}>File name template</label>
+            <label className={sublabel}>{t('set.fileNameTemplate')}</label>
             <button
-              onClick={() => setCustomOpen(!customOpen)}
+              onClick={() => {
+                if (customOpen) {
+                  // Close = discard this edit session, restore the
+                  // template that was active before the editor opened.
+                  setFileFmt(editorSnapshot)
+                  setTemplateError(false)
+                  setCustomOpen(false)
+                } else {
+                  // Open = start from a blank template.
+                  setEditorSnapshot(fileFmt)
+                  setFileFmt('')
+                  setTemplateError(false)
+                  setCustomOpen(true)
+                }
+              }}
               className="text-[13px] text-purple-light cursor-pointer select-none hover:text-purple transition-colors"
             >
-              {customOpen ? '✕ Close' : '+ Custom ▸'}
+              {customOpen ? t('set.customClose') : t('set.customOpen')}
             </button>
           </div>
-          <Dropdown value={fileFmt} options={FILE_PRESETS}
+          <Dropdown
+            value={templateToDisplay(fileFmt, lang)}
+            options={FILE_PRESETS.map((p) => templateToDisplay(p, lang))}
             open={fileOpen} onToggle={() => setFileOpen(!fileOpen)}
-            onSelect={(v) => { setFileFmt(v); update('track_format', v) }}
+            onSelect={(v) => {
+              const real = displayToTemplate(v, lang)
+              setFileFmt(real)
+              update('track_format', real)
+            }}
           />
           {customOpen && (
             <div className="mt-3 p-3 bg-bg-input/50 border border-border rounded-lg animate-fade-in">
-              <p className="text-[13px] text-text-muted mb-2">TOKENS</p>
+              <p className="text-[13px] text-text-muted mb-2">{t('set.tokens')}</p>
               <div className="flex gap-1.5 flex-wrap mb-3">
-                {['{track}', '{title}', '{artist}', '{album}', '{year}', '{bit_depth}'].map((t) => (
+                {['{track}', '{title}', '{artist}', '{album}', '{year}', '{bit_depth}'].map((tk) => (
                   <button
-                    key={t}
-                    onClick={() => setFileFmt((fileFmt + t).replace('}{', '} {'))}
+                    key={tk}
+                    onClick={() => setFileFmt((fileFmt + tk).replace('}{', '} {'))}
                     className="px-2 py-0.5 bg-purple-ghost text-purple-light rounded-full text-[13px] font-medium hover:bg-purple hover:text-white transition-colors"
-                  >{t}</button>
+                  >{templateToDisplay(tk, lang)}</button>
                 ))}
               </div>
-              <p className="text-[13px] text-text-muted mb-2">SEPARATORS</p>
+              <p className="text-[13px] text-text-muted mb-2">{t('set.separators')}</p>
               <div className="flex gap-1.5 flex-wrap mb-3">
                 {[' — ', '.', '/', '(', ')', ' '].map((s) => (
                   <button
@@ -209,42 +289,53 @@ export default function SettingsTab() {
                   >{s.trim() === '' ? '␣' : s}</button>
                 ))}
               </div>
-              <p className="text-[13px] text-text-muted mb-2">CURRENT TEMPLATE</p>
-              <div className="px-2.5 py-2 bg-bg-input border border-purple rounded-lg text-[13px] text-purple-light font-mono mb-3 min-h-[28px]">
-                {fileFmt}
-              </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setFileFmt(fileFmt.slice(0, -1))}
+                  onClick={() => setFileFmt(deleteLastUnit(fileFmt))}
                   className="flex-1 h-9 bg-bg-input border border-border rounded text-[13px] text-text-secondary hover:border-text-muted transition-colors"
-                >⌫ Delete Last</button>
+                >{t('set.deleteLast')}</button>
                 <button
-                  onClick={() => { update('track_format', fileFmt); setCustomOpen(false) }}
+                  onClick={() => {
+                    // Valid template: non-empty AND contains at least one token
+                    if (!/\{[a-z_]+\}/.test(fileFmt)) {
+                      setTemplateError(true)
+                      return
+                    }
+                    setTemplateError(false)
+                    update('track_format', fileFmt)
+                    setEditorSnapshot(fileFmt)
+                    setCustomOpen(false)
+                  }}
                   className="flex-1 h-9 bg-purple text-white rounded text-[13px] font-medium hover:bg-[#6d28d9] transition-colors"
-                >✓ Save Template</button>
+                >{t('set.saveTemplate')}</button>
               </div>
+              {templateError && (
+                <p className="text-red-500 text-[13px] mt-2 animate-fade-in">
+                  {t('set.templateEmpty')}
+                </p>
+              )}
             </div>
           )}
           <p className="text-[13px] text-text-muted mt-1.5">
-            Preview: <TemplatePreview template={fileFmt} type="file" />
+            {t('set.preview')} <TemplatePreview template={fileFmt} type="file" />
           </p>
         </div>
       </section>
 
       {/* ARTWORK */}
       <section className="mb-7">
-        <h2 className={sectionTitle}>Artwork</h2>
+        <h2 className={sectionTitle}>{t('set.artwork')}</h2>
 
         <div className="flex items-center justify-between py-2.5 border-b border-white/[0.02]">
           <div>
-            <p className="text-sm text-text-secondary">Embed cover in audio files</p>
-            <p className="text-[13px] text-text-muted">Write cover art into FLAC metadata</p>
+            <p className="text-sm text-text-secondary">{t('set.embedCover')}</p>
+            <p className="text-[13px] text-text-muted">{t('set.embedCoverHint')}</p>
           </div>
           <Toggle enabled={embedCover} onChange={(v) => { setEmbedCover(v); update('embed_cover', v) }} />
         </div>
 
         <div className={embedCover ? 'mb-3' : 'mb-3 opacity-35 pointer-events-none'}>
-          <label className={`${sublabel} mt-1`}>Embedded cover size</label>
+          <label className={`${sublabel} mt-1`}>{t('set.embedSize')}</label>
           <Dropdown value={embedSize} options={EMBED_SIZES}
             open={embedSizeOpen} onToggle={() => setEmbedSizeOpen(!embedSizeOpen)}
             onSelect={(v) => { setEmbedSize(v); update('embed_size', v) }}
@@ -255,15 +346,15 @@ export default function SettingsTab() {
 
         <div className="flex items-center justify-between py-2.5 border-b border-white/[0.02]">
           <div>
-            <p className="text-sm text-text-muted">Save cover.jpg separately</p>
-            <p className="text-[13px] text-text-muted">Save highest-quality cover next to audio files</p>
+            <p className="text-sm text-text-muted">{t('set.saveCover')}</p>
+            <p className="text-[13px] text-text-muted">{t('set.saveCoverHint')}</p>
           </div>
           <Toggle enabled={saveCover} onChange={(v) => { setSaveCover(v); update('save_artwork', v) }} />
         </div>
 
         {saveCover && (
           <div className="mt-3 animate-fade-in">
-            <label className={sublabel}>Saved cover max width</label>
+            <label className={sublabel}>{t('set.savedWidth')}</label>
             <Dropdown value={savedWidth} options={SAVED_WIDTHS}
               open={savedWidthOpen} onToggle={() => setSavedWidthOpen(!savedWidthOpen)}
               onSelect={(v) => { setSavedWidth(v); update('saved_max_width', v) }}
@@ -274,37 +365,37 @@ export default function SettingsTab() {
 
       {/* ACCOUNT */}
       <section className="mb-7">
-        <h2 className={sectionTitle}>Account</h2>
+        <h2 className={sectionTitle}>{t('set.account')}</h2>
         <div className="bg-bg-card/40 border border-border rounded-xl p-3.5 flex items-center gap-2.5 mb-2.5">
           <div className="w-2.5 h-2.5 rounded-full bg-green-quality flex-shrink-0" />
           <div className="flex-1">
-            <div className="text-sm text-text-primary">Qobuz — Connected</div>
-            <div className="text-[13px] text-text-muted">Signed in · Ready to download</div>
+            <div className="text-sm text-text-primary">{t('set.connected')}</div>
+            <div className="text-[13px] text-text-muted">{t('set.signedIn')}</div>
           </div>
           <button onClick={signOut}
             className="h-9 px-3.5 border border-red-500 text-red-500 rounded text-[13px] hover:bg-red-500/10 transition flex-shrink-0"
-          >Sign Out</button>
+          >{t('set.signOut')}</button>
         </div>
       </section>
 
       {/* ABOUT */}
       <section>
-        <h2 className={sectionTitle}>About</h2>
+        <h2 className={sectionTitle}>{t('set.about')}</h2>
         <div className="flex justify-between items-center py-2 border-b border-white/[0.02]">
-          <span className="text-sm text-text-muted">Version</span>
-          <span className="text-sm text-text-secondary">0.1.0</span>
+          <span className="text-sm text-text-muted">{t('set.version')}</span>
+          <span className="text-sm text-text-secondary">0.2.0</span>
         </div>
         <div className="flex justify-between items-center py-2 border-b border-white/[0.02]">
-          <span className="text-sm text-text-muted">Check for updates</span>
+          <span className="text-sm text-text-muted">{t('set.checkUpdates')}</span>
           <span
             className="text-[13px] text-purple-light cursor-pointer select-none hover:text-text-primary transition"
             onClick={() => window.electronAPI?.openExternal('https://github.com/zyw0815/Qrip')}
           >
-            Check ▸
+            {t('set.check')}
           </span>
         </div>
         <div className="flex justify-between items-center py-2">
-          <span className="text-sm text-text-muted">Author</span>
+          <span className="text-sm text-text-muted">{t('set.author')}</span>
           <span
             className="text-[13px] text-purple-light cursor-pointer select-none hover:text-text-primary transition"
             onClick={() => window.electronAPI?.openExternal('https://github.com/zyw0815')}

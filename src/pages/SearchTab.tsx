@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import SearchResultCard from '../components/SearchResultCard'
 import { API_BASE } from '../App'
+import { useI18n } from '../i18n'
 
 type Mode = 'url' | 'search'
 type FilterType = 'all' | 'album' | 'track' | 'playlist'
@@ -16,6 +17,7 @@ interface Result {
 }
 
 export default function SearchTab() {
+  const { t } = useI18n()
   const [mode, setMode] = useState<Mode>('url')
   // Separate state per mode — switching modes preserves both sides
   const [urlInput, setUrlInput] = useState('')
@@ -46,13 +48,13 @@ export default function SearchTab() {
       })
       if (!r.ok) {
         const d = await r.json()
-        setError(d.detail || 'Failed to resolve URL')
+        setError(d.detail || t('search.errResolve'))
         return
       }
       const data = await r.json()
-      setResults([formatResult(data)])
+      setResults([formatResult(data, t)])
     } catch {
-      setError('Backend connection failed')
+      setError(t('search.errConn'))
     } finally {
       setLoading(false)
     }
@@ -71,14 +73,14 @@ export default function SearchTab() {
       })
       if (!r.ok) {
         const d = await r.json()
-        setError(d.detail || 'Search failed')
+        setError(d.detail || t('search.errSearch'))
         return
       }
       const data = await r.json()
-      setResults((data.results || []).map(formatResult))
+      setResults((data.results || []).map((x: Record<string, unknown>) => formatResult(x, t)))
       setTotal(data.total || 0)
     } catch {
-      setError('Backend connection failed')
+      setError(t('search.errConn'))
     } finally {
       setLoading(false)
     }
@@ -100,11 +102,11 @@ export default function SearchTab() {
       })
       if (r.ok) {
         const data = await r.json()
-        setResults((prev) => [...prev, ...(data.results || []).map(formatResult)])
+        setResults((prev) => [...prev, ...(data.results || []).map((x: Record<string, unknown>) => formatResult(x, t))])
         setTotal(data.total || 0)
       }
     } catch {
-      setError('Backend connection failed')
+      setError(t('search.errConn'))
     } finally {
       setLoadingMore(false)
     }
@@ -125,7 +127,7 @@ export default function SearchTab() {
         setAddedIds((prev) => new Set(prev).add(result.id))
       }
     } catch {
-      setError('Failed to add to download queue')
+      setError(t('search.errAdd'))
     }
   }
 
@@ -143,15 +145,15 @@ export default function SearchTab() {
       const r = await fetch(`${API_BASE}/search/tracks/${result.id}`)
       if (r.ok) {
         const data = await r.json()
-        const tracks = (data.tracks || []).map((t: { id: string; title: string; artist: string }) => ({
-          ...t,
-          added: addedIds.has(t.id),
+        const tracks = (data.tracks || []).map((x: { id: string; title: string; artist: string }) => ({
+          ...x,
+          added: addedIds.has(x.id),
         }))
         setTrackLists((prev) => new Map(prev).set(result.id, tracks))
         setExpandedIds((prev) => new Set(prev).add(result.id))
       }
     } catch {
-      setError('Failed to load tracks')
+      setError(t('search.errTracks'))
     }
   }
 
@@ -172,7 +174,7 @@ export default function SearchTab() {
                 : 'bg-bg-input text-text-muted border-border hover:border-text-muted'
             }`}
           >
-            {m === 'url' ? '🔗 URL' : '🔍 Search'}
+            {m === 'url' ? t('search.urlTab') : t('search.searchTab')}
           </button>
         ))}
       </div>
@@ -180,7 +182,7 @@ export default function SearchTab() {
       {/* Input */}
       <div className="mb-4">
         <label className="text-[13px] text-text-muted block mb-1">
-          {mode === 'url' ? 'Paste a Qobuz link' : 'Search Qobuz'}
+          {mode === 'url' ? t('search.pasteLabel') : t('search.searchLabel')}
         </label>
         <input
           value={input}
@@ -191,7 +193,7 @@ export default function SearchTab() {
           placeholder={
             mode === 'url'
               ? 'open.qobuz.com/album/...'
-              : 'Artist, album, or track name...'
+              : t('search.searchPlaceholder')
           }
           className="w-full h-[46px] bg-bg-input border border-purple rounded-lg px-3 text-lg text-purple-light placeholder:text-text-muted outline-none transition"
         />
@@ -201,18 +203,18 @@ export default function SearchTab() {
       {mode === 'url' && (
         <div className="bg-bg-card/40 border border-border rounded-lg p-4 mb-4">
           <p className="text-[13px] text-text-muted tracking-wider mb-2 uppercase">
-            Supported Links
+            {t('search.supported')}
           </p>
           <p className="text-[13px] text-text-secondary py-0.5">
-            🎵 Track:{' '}
+            {t('search.trackLink')}{' '}
             <b className="text-purple-light">open.qobuz.com/track</b>/...
           </p>
           <p className="text-[13px] text-text-secondary py-0.5">
-            💿 Album:{' '}
+            {t('search.albumLink')}{' '}
             <b className="text-purple-light">open.qobuz.com/album</b>/...
           </p>
           <p className="text-[13px] text-text-secondary py-0.5">
-            📋 Playlist:{' '}
+            {t('search.playlistLink')}{' '}
             <b className="text-purple-light">open.qobuz.com/playlist</b>/...
           </p>
         </div>
@@ -232,12 +234,12 @@ export default function SearchTab() {
               }`}
             >
               {f === 'all'
-                ? 'All'
+                ? t('search.filterAll')
                 : f === 'album'
-                  ? '💿 Albums'
+                  ? t('search.filterAlbums')
                   : f === 'track'
-                    ? '🎵 Tracks'
-                    : '📋 Playlists'}
+                    ? t('search.filterTracks')
+                    : t('search.filterPlaylists')}
             </button>
           ))}
         </div>
@@ -250,7 +252,7 @@ export default function SearchTab() {
           disabled={loading || !input.trim()}
           className="h-10 px-10 bg-purple text-white rounded-md text-base font-medium hover:bg-[#6d28d9] transition disabled:opacity-50"
         >
-          {loading ? 'Working...' : mode === 'url' ? 'Resolve ▸' : 'Search ▸'}
+          {loading ? t('search.working') : mode === 'url' ? t('search.resolve') : t('search.searchBtn')}
         </button>
       </div>
 
@@ -287,7 +289,9 @@ export default function SearchTab() {
             disabled={loadingMore}
             className="h-10 px-8 bg-bg-input border border-border text-text-secondary rounded-lg text-base font-medium hover:border-purple hover:text-purple-light transition disabled:opacity-50"
           >
-            {loadingMore ? 'Loading...' : `Load more (${total - results.length} left) ▾`}
+            {loadingMore
+              ? t('search.loadingMore')
+              : t('search.loadMore', { n: total - results.length })}
           </button>
         </div>
       )}
@@ -295,13 +299,16 @@ export default function SearchTab() {
   )
 }
 
-function formatResult(item: Record<string, any>): Result {
+function formatResult(
+  item: Record<string, any>,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): Result {
   // Resolve returns {type, data}; search returns the item directly
   const d = item.data || item
   const meta: string[] = []
   if (d.album_title) meta.push(`💿 ${d.album_title}`)
   if (d.year) meta.push(String(d.year))
-  if (d.tracks_count) meta.push(`${d.tracks_count} tracks`)
+  if (d.tracks_count) meta.push(t('search.metaTracks', { n: d.tracks_count }))
   if (d.duration) {
     const mins = Math.floor(Number(d.duration) / 60)
     const secs = Number(d.duration) % 60
