@@ -1,11 +1,21 @@
 import { useState, useEffect } from 'react'
 import LoginPage from './pages/LoginPage'
 import MainLayout from './pages/MainLayout'
+import { LanguageProvider, useI18n } from './i18n'
 
 export const API_BASE = 'http://127.0.0.1:8000'
 
 export default function App() {
+  return (
+    <LanguageProvider>
+      <AppInner />
+    </LanguageProvider>
+  )
+}
+
+function AppInner() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const { t } = useI18n()
 
   useEffect(() => {
     let retries = 0
@@ -32,7 +42,7 @@ export default function App() {
           <h1 className="text-[32px] font-extrabold tracking-[-0.5px] bg-gradient-to-r from-purple-light to-purple bg-clip-text text-transparent mb-3">
             Qrip
           </h1>
-          <p className="text-lg text-text-muted">Starting up…</p>
+          <p className="text-lg text-text-muted">{t('app.starting')}</p>
         </div>
       </div>
     )

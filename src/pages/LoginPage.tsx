@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { API_BASE } from '../App'
+import { useI18n } from '../i18n'
 
 export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void }) {
+  const { t } = useI18n()
   const [token, setToken] = useState('')
   const [showToken, setShowToken] = useState(false)
   const [error, setError] = useState('')
@@ -11,7 +13,7 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
 
   const handlePopupLogin = async () => {
     if (!isElectron) {
-      setError('Popup login requires the desktop app. Use Token login instead.')
+      setError(t('login.popupHintBrowser'))
       return
     }
     setLoading(true)
@@ -39,13 +41,13 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
         if (r.ok) onAuthSuccess()
         else {
           const data = await r.json()
-          setError(data.detail || 'Login failed')
+          setError(data.detail || t('login.errFailed'))
         }
       } else {
-        setError('OAuth window closed without completing login')
+        setError(t('login.errClosed'))
       }
     } catch {
-      setError('OAuth flow failed')
+      setError(t('login.errFlow'))
     } finally {
       setLoading(false)
     }
@@ -63,10 +65,10 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
       if (r.ok) onAuthSuccess()
       else {
         const data = await r.json()
-        setError(data.detail || 'Invalid token')
+        setError(data.detail || t('login.errInvalid'))
       }
     } catch {
-      setError('Connection failed. Is the backend running?')
+      setError(t('login.errConn'))
     } finally {
       setLoading(false)
     }
@@ -83,7 +85,7 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
         <h1 className="text-[36px] font-extrabold tracking-[-0.5px] bg-gradient-to-r from-purple-light to-purple bg-clip-text text-transparent mb-1">
           Qrip
         </h1>
-        <p className="text-base text-text-muted mb-8">Sign in to start downloading</p>
+        <p className="text-base text-text-muted mb-8">{t('login.subtitle')}</p>
 
         {/* Primary: popup login */}
         <button
@@ -92,18 +94,16 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
           className="w-full h-[52px] bg-purple text-white rounded-xl text-lg font-semibold flex items-center justify-center gap-2.5 hover:bg-[#6d28d9] transition disabled:opacity-50 shadow-[0_4px_20px_rgba(124,58,237,0.35)]"
         >
           <span className="text-xl">🎵</span>
-          {loading ? 'Opening...' : 'Sign in with Qobuz'}
+          {loading ? t('login.opening') : t('login.popup')}
         </button>
         <p className="text-sm text-text-muted mt-3">
-          {isElectron
-            ? 'Opens the Qobuz sign-in window — any login method works'
-            : 'Popup login is only available in the desktop app. Use Token login below.'}
+          {isElectron ? t('login.popupHintElectron') : t('login.popupHintBrowser')}
         </p>
 
         {/* Divider */}
         <div className="flex items-center gap-3 my-7">
           <div className="flex-1 h-px bg-border" />
-          <span className="text-sm text-text-muted">or</span>
+          <span className="text-sm text-text-muted">{t('login.or')}</span>
           <div className="flex-1 h-px bg-border" />
         </div>
 
@@ -113,14 +113,14 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
             onClick={() => setShowToken(true)}
             className="text-sm text-text-secondary hover:text-purple-light transition"
           >
-            Sign in with Token ▾
+            {t('login.tokenLink')}
           </button>
         ) : (
           <div className="flex flex-col gap-3 animate-fade-in text-left">
             <textarea
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              placeholder="Paste your Qobuz auth token..."
+              placeholder={t('login.tokenPlaceholder')}
               className="w-full h-24 bg-bg-input border border-border rounded-lg px-3 py-2.5 text-base text-text-primary placeholder:text-text-muted outline-none focus:border-purple transition resize-none"
             />
             <button
@@ -128,7 +128,7 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
               disabled={loading || !token.trim()}
               className="w-full h-[46px] bg-bg-input border border-border text-text-primary rounded-lg text-base font-medium hover:border-purple hover:text-purple-light transition disabled:opacity-50"
             >
-              {loading ? 'Authenticating...' : 'Authenticate with Token'}
+              {loading ? t('login.authenticating') : t('login.tokenBtn')}
             </button>
           </div>
         )}
