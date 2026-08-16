@@ -234,7 +234,15 @@ export default function SettingsTab() {
           <div className="flex justify-between items-center mb-1">
             <label className={sublabel}>{t('set.fileNameTemplate')}</label>
             <button
-              onClick={() => setCustomOpen(!customOpen)}
+              onClick={() => {
+                // Closing with an invalid (empty / token-less) template
+                // must fail the same validation as saving.
+                if (customOpen && !/\{[a-z_]+\}/.test(fileFmt)) {
+                  setTemplateError(true)
+                  return
+                }
+                setCustomOpen(!customOpen)
+              }}
               className="text-[13px] text-purple-light cursor-pointer select-none hover:text-purple transition-colors"
             >
               {customOpen ? t('set.customClose') : t('set.customOpen')}
