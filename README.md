@@ -8,9 +8,9 @@
 
 [![CI](https://github.com/zyw0815/Qrip/actions/workflows/build.yml/badge.svg)](https://github.com/zyw0815/Qrip/actions/workflows/build.yml)
 [![release](https://img.shields.io/github/v/release/zyw0815/Qrip)](https://github.com/zyw0815/Qrip/releases)
-[![license](https://img.shields.io/badge/license-MIT-blue)](#license)
+[![license](https://img.shields.io/badge/license-GPL--3.0-blue)](#license)
 
-[Download](#download) · [Features](#features) · [Screenshots](#screenshots) · [Build from source](#build-from-source) · [Architecture](#architecture) · [License](#license)
+[Download](#download) · [Features](#features) · [Screenshots](#screenshots) · [Build from source](#build-from-source) · [Architecture](#architecture) · [License](#license) · [Disclaimer](#disclaimer)
 
 </div>
 
@@ -127,12 +127,10 @@ Highlights:
 
 ## License
 
-Qrip is released under the [MIT License](LICENSE).
+Qrip is released under the [GNU General Public License v3.0](LICENSE).
 
-Qrip vendors the [streamrip](https://github.com/nathom/streamrip) core library (in `streamrip/`), which remains under its original GPL-3.0 license — see `streamrip/LICENSE`.
+Qrip vendors the [streamrip](https://github.com/nathom/streamrip) core library (in `streamrip/`), which is also GPL-3.0 licensed — see `streamrip/LICENSE`.
 
-## Notes
+## Disclaimer
 
-This tool is for downloading music you have the rights to — your own Qobuz purchases and streams, for personal use only.
-
-**This software must not be used for any commercial purpose.**
+I will not be responsible for how you use Qrip. By using Qrip, you agree to the terms and conditions of the Qobuz's API.
