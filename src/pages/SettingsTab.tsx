@@ -245,7 +245,9 @@ export default function SettingsTab() {
                   setTemplateError(false)
                   setCustomOpen(false)
                 } else {
+                  // Open = start from a blank template.
                   setEditorSnapshot(fileFmt)
+                  setFileFmt('')
                   setTemplateError(false)
                   setCustomOpen(true)
                 }
