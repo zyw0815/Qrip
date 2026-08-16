@@ -3,7 +3,7 @@ import { API_BASE } from '../App'
 import { useI18n } from '../i18n'
 
 export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void }) {
-  const { t } = useI18n()
+  const { t, lang, setLang } = useI18n()
   const [token, setToken] = useState('')
   const [showToken, setShowToken] = useState(false)
   const [error, setError] = useState('')
@@ -80,7 +80,24 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-8" style={bgStyle}>
+    <div className="min-h-screen flex items-center justify-center p-8 relative" style={bgStyle}>
+      {/* Language toggle — first-time users can't reach Settings before login */}
+      <div className="absolute top-4 right-4 flex gap-1.5">
+        {(['en', 'zh'] as const).map((l) => (
+          <button
+            key={l}
+            onClick={() => setLang(l)}
+            className={`px-3 py-1.5 rounded-full text-sm transition border ${
+              lang === l
+                ? 'bg-purple-ghost text-purple-light border-purple'
+                : 'bg-bg-input text-text-muted border-border hover:border-text-muted'
+            }`}
+          >
+            {l === 'en' ? 'English' : '中文'}
+          </button>
+        ))}
+      </div>
+
       <div className="w-full max-w-[400px] text-center animate-fade-in">
         <h1 className="text-[36px] font-extrabold tracking-[-0.5px] bg-gradient-to-r from-purple-light to-purple bg-clip-text text-transparent mb-1">
           Qrip
