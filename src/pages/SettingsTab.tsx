@@ -129,6 +129,7 @@ export default function SettingsTab() {
   const [savedWidthOpen, setSavedWidthOpen] = useState(false)
   const [customOpen, setCustomOpen] = useState(false)
   const [langOpen, setLangOpen] = useState(false)
+  const [templateError, setTemplateError] = useState(false)
 
   useEffect(() => {
     fetch(`${API_BASE}/config/`)
@@ -277,10 +278,24 @@ export default function SettingsTab() {
                   className="flex-1 h-9 bg-bg-input border border-border rounded text-[13px] text-text-secondary hover:border-text-muted transition-colors"
                 >{t('set.deleteLast')}</button>
                 <button
-                  onClick={() => { update('track_format', fileFmt); setCustomOpen(false) }}
+                  onClick={() => {
+                    // Valid template: non-empty AND contains at least one token
+                    if (!/\{[a-z_]+\}/.test(fileFmt)) {
+                      setTemplateError(true)
+                      return
+                    }
+                    setTemplateError(false)
+                    update('track_format', fileFmt)
+                    setCustomOpen(false)
+                  }}
                   className="flex-1 h-9 bg-purple text-white rounded text-[13px] font-medium hover:bg-[#6d28d9] transition-colors"
                 >{t('set.saveTemplate')}</button>
               </div>
+              {templateError && (
+                <p className="text-red-500 text-[13px] mt-2 animate-fade-in">
+                  {t('set.templateEmpty')}
+                </p>
+              )}
             </div>
           )}
           <p className="text-[13px] text-text-muted mt-1.5">
