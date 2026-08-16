@@ -48,6 +48,15 @@ function displayToTemplate(display: string, lang: 'en' | 'zh'): string {
   return display.replace(/\{[^}]+\}/g, (m) => TOKEN_ZH_REVERSE[m] ?? m)
 }
 
+// Split a template into units (a {token} or a separator chunk) and drop
+// the last one — deletes whole tokens instead of one character at a time.
+function deleteLastUnit(template: string): string {
+  const parts = template.split(/(\{[^}]*\})/).filter(Boolean)
+  if (parts.length === 0) return ''
+  parts.pop()
+  return parts.join('')
+}
+
 function Dropdown({ value, options, onSelect, open, onToggle }: {
   value: string
   options: string[]
@@ -262,13 +271,9 @@ export default function SettingsTab() {
                   >{s.trim() === '' ? '␣' : s}</button>
                 ))}
               </div>
-              <p className="text-[13px] text-text-muted mb-2">{t('set.currentTemplate')}</p>
-              <div className="px-2.5 py-2 bg-bg-input border border-purple rounded-lg text-[13px] text-purple-light font-mono mb-3 min-h-[28px]">
-                {templateToDisplay(fileFmt, lang)}
-              </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setFileFmt(fileFmt.slice(0, -1))}
+                  onClick={() => setFileFmt(deleteLastUnit(fileFmt))}
                   className="flex-1 h-9 bg-bg-input border border-border rounded text-[13px] text-text-secondary hover:border-text-muted transition-colors"
                 >{t('set.deleteLast')}</button>
                 <button
