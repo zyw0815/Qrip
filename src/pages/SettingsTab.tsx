@@ -383,7 +383,7 @@ export default function SettingsTab() {
         <h2 className={sectionTitle}>{t('set.about')}</h2>
         <div className="flex justify-between items-center py-2 border-b border-white/[0.02]">
           <span className="text-sm text-text-muted">{t('set.version')}</span>
-          <span className="text-sm text-text-secondary">0.1.0</span>
+          <span className="text-sm text-text-secondary">0.2.0</span>
         </div>
         <div className="flex justify-between items-center py-2 border-b border-white/[0.02]">
           <span className="text-sm text-text-muted">{t('set.checkUpdates')}</span>
