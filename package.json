@@ -59,6 +59,7 @@
     "directories": {
       "output": "release"
     },
-    "publish": null
+    "publish": null,
+    "afterPack": "scripts/after-pack.cjs"
   }
 }
