@@ -130,6 +130,9 @@ export default function SettingsTab() {
   const [customOpen, setCustomOpen] = useState(false)
   const [langOpen, setLangOpen] = useState(false)
   const [templateError, setTemplateError] = useState(false)
+  // Snapshot of the template before the custom editor opened —
+  // closing discards the edit and restores it.
+  const [editorSnapshot, setEditorSnapshot] = useState(FILE_PRESETS[0])
 
   useEffect(() => {
     fetch(`${API_BASE}/config/`)
@@ -235,13 +238,17 @@ export default function SettingsTab() {
             <label className={sublabel}>{t('set.fileNameTemplate')}</label>
             <button
               onClick={() => {
-                // Closing with an invalid (empty / token-less) template
-                // must fail the same validation as saving.
-                if (customOpen && !/\{[a-z_]+\}/.test(fileFmt)) {
-                  setTemplateError(true)
-                  return
+                if (customOpen) {
+                  // Close = discard this edit session, restore the
+                  // template that was active before the editor opened.
+                  setFileFmt(editorSnapshot)
+                  setTemplateError(false)
+                  setCustomOpen(false)
+                } else {
+                  setEditorSnapshot(fileFmt)
+                  setTemplateError(false)
+                  setCustomOpen(true)
                 }
-                setCustomOpen(!customOpen)
               }}
               className="text-[13px] text-purple-light cursor-pointer select-none hover:text-purple transition-colors"
             >
@@ -294,6 +301,7 @@ export default function SettingsTab() {
                     }
                     setTemplateError(false)
                     update('track_format', fileFmt)
+                    setEditorSnapshot(fileFmt)
                     setCustomOpen(false)
                   }}
                   className="flex-1 h-9 bg-purple text-white rounded text-[13px] font-medium hover:bg-[#6d28d9] transition-colors"
