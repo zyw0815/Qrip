@@ -2,11 +2,9 @@
 
 <div align="center">
 
-# Qrip
+<img src="img/icon.png" alt="Qrip" width="180" style="border-radius: 24px" />
 
 **给 streamrip 套上漂亮桌面 GUI 的 Qobuz 高解析度音乐下载器。**
-
-<img src="img/icon.png" alt="Qrip 图标" width="120" style="border-radius: 24px" />
 
 [![CI](https://github.com/zyw0815/Qrip/actions/workflows/build.yml/badge.svg)](https://github.com/zyw0815/Qrip/actions/workflows/build.yml)
 [![release](https://img.shields.io/github/v/release/zyw0815/Qrip)](https://github.com/zyw0815/Qrip/releases)
