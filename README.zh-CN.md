@@ -8,9 +8,9 @@
 
 [![CI](https://github.com/zyw0815/Qrip/actions/workflows/build.yml/badge.svg)](https://github.com/zyw0815/Qrip/actions/workflows/build.yml)
 [![release](https://img.shields.io/github/v/release/zyw0815/Qrip)](https://github.com/zyw0815/Qrip/releases)
-[![license](https://img.shields.io/badge/license-MIT-blue)](#许可证)
+[![license](https://img.shields.io/badge/license-GPL--3.0-blue)](#许可证)
 
-[下载安装](#下载安装) · [功能特性](#功能特性) · [截图](#截图) · [从源码构建](#从源码构建) · [架构](#架构) · [许可证](#许可证)
+[下载安装](#下载安装) · [功能特性](#功能特性) · [截图](#截图) · [从源码构建](#从源码构建) · [架构](#架构) · [许可证](#许可证) · [免责声明](#免责声明)
 
 </div>
 
@@ -127,12 +127,10 @@ Qrip 是三层协作:
 
 ## 许可证
 
-Qrip 以 [MIT License](LICENSE) 发布。
+Qrip 以 [GNU General Public License v3.0](LICENSE) 发布。
 
-Qrip vendor 了 [streamrip](https://github.com/nathom/streamrip) 核心库(位于 `streamrip/`),其保持原有 GPL-3.0 许可证——见 `streamrip/LICENSE`。
+Qrip vendor 了 [streamrip](https://github.com/nathom/streamrip) 核心库(位于 `streamrip/`),同样是 GPL-3.0 许可证——见 `streamrip/LICENSE`。
 
-## 说明
+## 免责声明
 
-本工具用于下载你有权使用的音乐——你自己购买 / 订阅的 Qobuz 内容,仅供个人使用。
-
-**本软件不可用于任何商业行为。**
+我不对您使用 Qrip 的方式负责。使用 Qrip 即表示您同意 Qobuz API 的条款与条件。
