@@ -6,6 +6,8 @@
 
 **A beautiful desktop GUI for downloading hi-res music from Qobuz — built on top of streamrip.**
 
+<img src="img/icon.png" alt="Qrip icon" width="120" style="border-radius: 24px" />
+
 [![CI](https://github.com/zyw0815/Qrip/actions/workflows/build.yml/badge.svg)](https://github.com/zyw0815/Qrip/actions/workflows/build.yml)
 [![release](https://img.shields.io/github/v/release/zyw0815/Qrip)](https://github.com/zyw0815/Qrip/releases)
 [![license](https://img.shields.io/badge/license-GPL--3.0-blue)](#license)
