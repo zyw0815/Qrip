@@ -25,10 +25,9 @@ function interceptQobuzAuth(session, onCaptured) {
 function startPython() {
     if (electron_1.app.isPackaged) {
         // Packaged: spawn the PyInstaller-built standalone backend binary.
+        // onedir layout: resources/backend/qrip-server/qrip-server(.exe)
         const binaryName = process.platform === 'win32' ? 'qrip-server.exe' : 'qrip-server';
-        pythonProcess = (0, child_process_1.spawn)(path_1.default.join(process.resourcesPath, 'backend', binaryName), [], {
-            env: { ...process.env, PYTHONUNBUFFERED: '1' },
-        });
+        pythonProcess = (0, child_process_1.spawn)(path_1.default.join(process.resourcesPath, 'backend', 'qrip-server', binaryName), [], { env: { ...process.env, PYTHONUNBUFFERED: '1' } });
     }
     else {
         // Dev: use the conda env python directly.
