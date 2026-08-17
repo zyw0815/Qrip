@@ -16,7 +16,7 @@ else:
     STREAMRIP_PATH = os.path.expanduser("~/Study/MyProject/streamrip")
 sys.path.insert(0, STREAMRIP_PATH)
 
-from auth import get_config
+from auth import get_config, _save_settings
 
 router = APIRouter()
 
@@ -36,18 +36,51 @@ def native_to_ui(template: str, kind: str) -> str:
     return template.replace("{tracknumber}", "{track}")
 
 
+# Quality: UI uses index 0-3, streamrip native values are 1-4
+# (1=MP3 320, 2=16/44.1, 3=24/96, 4=24/192).
+def quality_to_ui(q: int) -> int:
+    return max(0, min(3, q - 1))
+
+
+def quality_to_native(idx: int) -> int:
+    return max(1, min(4, idx + 1))
+
+
+# embed_size: UI label <-> streamrip native value
+EMBED_SIZE_TO_NATIVE = {
+    "Thumbnail (≈250×250)": "thumbnail",
+    "Small (≈600×600)": "small",
+    "Large (≈1400×1400)": "large",
+    "Original": "original",
+}
+EMBED_SIZE_TO_UI = {v: k for k, v in EMBED_SIZE_TO_NATIVE.items()}
+
+# saved_max_width: UI label <-> native int (-1 = no resize)
+SAVED_WIDTH_TO_NATIVE = {
+    "250": 250,
+    "600": 600,
+    "1400": 1400,
+    "Original (no resize)": -1,
+}
+SAVED_WIDTH_TO_UI = {v: k for k, v in SAVED_WIDTH_TO_NATIVE.items()}
+
+
 @router.get("/")
 async def get_config_all():
     cfg = get_config()
     return {
         "download_folder": cfg.session.downloads.folder,
-        "quality": cfg.session.qobuz.quality,
+        "quality": quality_to_ui(cfg.session.qobuz.quality),
         "folder_format": native_to_ui(cfg.session.filepaths.folder_format, "folder"),
         "track_format": native_to_ui(cfg.session.filepaths.track_format, "file"),
         "embed_cover": cfg.session.artwork.embed,
-        "embed_size": cfg.session.artwork.embed_size,
+        "embed_size": EMBED_SIZE_TO_UI.get(
+            cfg.session.artwork.embed_size, cfg.session.artwork.embed_size
+        ),
         "save_artwork": cfg.session.artwork.save_artwork,
-        "saved_max_width": cfg.session.artwork.saved_max_width,
+        "saved_max_width": SAVED_WIDTH_TO_UI.get(
+            cfg.session.artwork.saved_max_width, str(cfg.session.artwork.saved_max_width)
+        ),
     }
 
 
@@ -64,6 +97,12 @@ async def update_config(req: UpdateConfigRequest):
         value = ui_to_native(value, "folder")
     elif req.key == "track_format" and isinstance(value, str):
         value = ui_to_native(value, "file")
+    elif req.key == "quality" and isinstance(value, int):
+        value = quality_to_native(value)
+    elif req.key == "embed_size" and isinstance(value, str):
+        value = EMBED_SIZE_TO_NATIVE.get(value, value)
+    elif req.key == "saved_max_width" and isinstance(value, str):
+        value = SAVED_WIDTH_TO_NATIVE.get(value, -1)
     path_map = {
         "download_folder": ("downloads", "folder"),
         "quality": ("qobuz", "quality"),
@@ -78,5 +117,6 @@ async def update_config(req: UpdateConfigRequest):
         section, field = path_map[req.key]
         section_obj = getattr(cfg.session, section)
         setattr(section_obj, field, value)
-        cfg.file._modified = True
+        # Persist immediately — streamrip's own config file is never saved.
+        _save_settings(cfg)
     return {"status": "ok"}

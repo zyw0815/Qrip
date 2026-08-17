@@ -7,6 +7,7 @@ export interface ElectronAPI {
   getDownloadPath(): Promise<string>
   pickFolder(): Promise<string | null>
   openExternal(url: string): Promise<void>
+  appVersion(): Promise<string>
 }
 
 declare global {

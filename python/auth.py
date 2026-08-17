@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import sys
 import os
+import json
 
 # streamrip is vendored inside the Qrip repo (../streamrip). Use it when
 # present so packaged builds are self-contained; fall back to the dev
@@ -28,6 +29,57 @@ _DEV_MODE = os.environ.get("QRIP_DEV", "0") == "1"
 
 # Persist credentials in Qrip's own config file so they survive restarts
 _QRIP_CONFIG_PATH = os.path.join(click.get_app_dir("Qrip"), "credentials.toml")
+# Settings also live in Qrip's app dir — streamrip's own config machinery is
+# never saved, so Qrip keeps its own file.
+_QRIP_SETTINGS_PATH = os.path.join(click.get_app_dir("Qrip"), "settings.toml")
+
+# Settings key -> (streamrip config section, field). Values are stored in
+# streamrip's native format (quality 1-4, embed_size "large" etc.).
+SETTINGS_FIELDS = {
+    "download_folder": ("downloads", "folder"),
+    "quality": ("qobuz", "quality"),
+    "folder_format": ("filepaths", "folder_format"),
+    "track_format": ("filepaths", "track_format"),
+    "embed_cover": ("artwork", "embed"),
+    "embed_size": ("artwork", "embed_size"),
+    "save_artwork": ("artwork", "save_artwork"),
+    "saved_max_width": ("artwork", "saved_max_width"),
+}
+
+
+def _toml_scalar(value) -> str:
+    """Render a Python value as a TOML scalar (strings via JSON escaping)."""
+    if isinstance(value, str):
+        return json.dumps(value)
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    return str(value)
+
+
+def _save_settings(cfg: Config):
+    """Write the current settings to Qrip's settings.toml."""
+    os.makedirs(os.path.dirname(_QRIP_SETTINGS_PATH), exist_ok=True)
+    lines = ["[settings]"]
+    for key, (section, field) in SETTINGS_FIELDS.items():
+        v = getattr(getattr(cfg.session, section), field)
+        lines.append(f"{key} = {_toml_scalar(v)}")
+    with open(_QRIP_SETTINGS_PATH, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def _load_settings(cfg: Config):
+    """Overlay settings.toml onto the config. Missing file -> no-op."""
+    if not os.path.exists(_QRIP_SETTINGS_PATH):
+        return
+    import tomllib
+    with open(_QRIP_SETTINGS_PATH, "rb") as f:
+        data = tomllib.load(f)
+    settings = data.get("settings", {})
+    for key, (section, field) in SETTINGS_FIELDS.items():
+        if key in settings:
+            setattr(getattr(cfg.session, section), field, settings[key])
 
 
 class TokenLoginRequest(BaseModel):
@@ -84,8 +136,20 @@ def get_config() -> Config:
         s.artwork.save_artwork = False
         if not s.downloads.folder:
             s.downloads.folder = os.path.expanduser("~/Music/Qrip")
-        if _load_saved_credentials(_config):
-            _logged_in = True
+        try:
+            if _load_saved_credentials(_config):
+                _logged_in = True
+        except Exception:
+            # A corrupt/partial credentials file must not break /auth/status
+            # (a 500 makes the frontend treat the backend as unavailable and
+            # give up) — treat it as "not logged in" instead.
+            _logged_in = False
+        try:
+            _load_settings(_config)
+        except Exception:
+            # Same policy as credentials: a corrupt settings file just
+            # means defaults for this run.
+            pass
     return _config
 
 

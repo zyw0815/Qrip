@@ -12,12 +12,15 @@ interface DownloadItem {
   speed: string
   status: 'downloading' | 'queued' | 'paused' | 'completed' | 'failed'
   paused?: boolean
+  error?: string
 }
 
 export default function DownloadsTab() {
   const { t } = useI18n()
   const [downloading, setDownloading] = useState<DownloadItem[]>([])
   const [queued, setQueued] = useState<DownloadItem[]>([])
+  const [failed, setFailed] = useState<DownloadItem[]>([])
+  const [completed, setCompleted] = useState<DownloadItem[]>([])
 
   useEffect(() => {
     const poll = async () => {
@@ -26,6 +29,8 @@ export default function DownloadsTab() {
         const data = await r.json()
         setDownloading(data.downloading || [])
         setQueued(data.queue || [])
+        setFailed(data.failed || [])
+        setCompleted(data.completed || [])
       } catch {
         // backend might not be ready yet
       }
@@ -44,8 +49,11 @@ export default function DownloadsTab() {
   const cancel = async (id: string) => {
     await fetch(`${API_BASE}/download/${id}/cancel`, { method: 'POST' })
   }
+  const retry = async (id: string) => {
+    await fetch(`${API_BASE}/download/${id}/retry`, { method: 'POST' })
+  }
 
-  if (downloading.length === 0 && queued.length === 0) {
+  if (downloading.length === 0 && queued.length === 0 && failed.length === 0 && completed.length === 0) {
     return (
       <div className="p-5 animate-fade-in h-full">
         <div className="text-center py-24">
@@ -77,7 +85,7 @@ export default function DownloadsTab() {
                   {d.name}
                 </span>
                 <span className="text-lg text-purple-light flex-shrink-0 font-medium">
-                  {d.downloaded} MB / {d.total} MB
+                  {d.total > 0 ? `${d.downloaded} MB / ${d.total} MB` : `${d.downloaded} MB`}
                 </span>
               </div>
               <ProgressBar
@@ -132,6 +140,55 @@ export default function DownloadsTab() {
               >
                 {t('dl.delete')}
               </button>
+            </div>
+          ))}
+        </>
+      )}
+      {/* Failed — shown with the reason so failures are never silent */}
+      {failed.length > 0 && (
+        <>
+          <p className="text-base text-text-muted tracking-wider mb-2.5 mt-5 font-semibold uppercase">
+            {t('dl.failed')}
+          </p>
+          {failed.map((f) => (
+            <div
+              key={f.item_id}
+              className="bg-bg-card/20 border border-red-500/30 rounded-xl px-4 py-3.5 mb-2 flex items-center gap-3"
+            >
+              <span className="text-lg flex-shrink-0">⚠️</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-lg text-text-primary truncate">{f.name}</div>
+                <div className="text-base text-red-400/90 truncate mt-0.5">
+                  {f.error || t('dl.failed')}
+                </div>
+              </div>
+              <button
+                onClick={() => retry(f.item_id)}
+                className="h-9 px-3.5 bg-bg-input border border-border rounded-md text-base text-text-secondary hover:border-purple hover:text-purple-light transition flex-shrink-0"
+              >
+                {t('dl.retry')}
+              </button>
+            </div>
+          ))}
+        </>
+      )}
+
+      {/* Completed (this session) */}
+      {completed.length > 0 && (
+        <>
+          <p className="text-base text-text-muted tracking-wider mb-2.5 mt-5 font-semibold uppercase">
+            {t('dl.completed')}
+          </p>
+          {completed.map((c) => (
+            <div
+              key={c.item_id}
+              className="bg-bg-card/20 border border-border rounded-xl px-4 py-3.5 mb-2 flex items-center gap-3"
+            >
+              <span className="text-lg flex-shrink-0">✅</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-lg text-text-primary truncate">{c.name}</div>
+                <div className="text-base text-text-muted truncate mt-0.5">{c.album}</div>
+              </div>
             </div>
           ))}
         </>

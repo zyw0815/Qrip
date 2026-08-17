@@ -5,6 +5,7 @@ import Store from 'electron-store'
 
 const store = new Store({ name: 'qrip-config' })
 let mainWindow: BrowserWindow | null = null
+let authWin: BrowserWindow | null = null
 let pythonProcess: ChildProcess | null = null
 
 // Qobuz sends X-User-Auth-Token header on authenticated API requests.
@@ -78,7 +79,13 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
   }
 
-  mainWindow.on('closed', () => { mainWindow = null })
+  mainWindow.on('closed', () => {
+    mainWindow = null
+    // Closing the main window quits the app, even if the OAuth window is
+    // still open (window-all-closed wouldn't fire while it exists).
+    if (authWin && !authWin.isDestroyed()) authWin.close()
+    app.quit()
+  })
 }
 
 // IPC Handlers
@@ -87,7 +94,7 @@ ipcMain.handle('open-oauth', async (_e, url: string) => {
     // Fresh in-memory partition every time — no cookies, no remembered
     // Google account. The user always starts from a clean login page.
     const partition = `oauth-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    const authWin = new BrowserWindow({
+    authWin = new BrowserWindow({
       width: 1200,
       height: 800,
       title: 'Qrip — Google Login',
@@ -175,6 +182,8 @@ ipcMain.handle('open-external', async (_e, url: string) => {
   if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return
   await shell.openExternal(url)
 })
+
+ipcMain.handle('app-version', () => app.getVersion())
 
 app.whenReady().then(() => {
   startPython()

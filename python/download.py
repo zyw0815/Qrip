@@ -5,7 +5,6 @@ import os
 import asyncio
 import shutil
 import time
-from pathlib import Path
 from typing import Optional
 
 # streamrip is vendored inside the Qrip repo (../streamrip). Use it when
@@ -375,15 +374,14 @@ async def _download_worker():
                 await asyncio.sleep(0.2)
             _check_cancelled(item_id)
 
-            # Estimate total size + poll folder for progress while ripping
-            download_folder = cfg.session.downloads.folder
+            # Estimate total size + poll this task's files for progress
             total_size = await _estimate_size(client, item_id, media_type, quality)
             _check_cancelled(item_id)
 
             rip_task = asyncio.create_task(media.rip())
             _rip_tasks[item_id] = rip_task
             _progress_poll = asyncio.create_task(
-                _poll_progress(item, download_folder, total_size)
+                _poll_progress(item, total_size)
             )
             try:
                 await rip_task
@@ -425,8 +423,15 @@ async def _download_worker():
 
 
 async def _estimate_size(client: QobuzClient, item_id: str, media_type: str, quality: int) -> int:
-    """Estimate total download size in MB by summing track sizes."""
+    """Estimate total download size in MB by summing track sizes.
+
+    Playlists are skipped: each get_downloadable call is rate-limited
+    (60/min), so a 500-track playlist would idle for minutes before the
+    first file. Their progress shows downloaded-only instead.
+    """
     try:
+        if media_type == "playlist":
+            return 0
         if media_type == "track":
             downloadables = [await client.get_downloadable(item_id, quality)]
         else:
@@ -450,8 +455,13 @@ async def _estimate_size(client: QobuzClient, item_id: str, media_type: str, qua
         return 0
 
 
-async def _poll_progress(item: dict, download_folder: str, total_size: int) -> None:
-    """Poll the download folder for file sizes to derive progress and speed."""
+async def _poll_progress(item: dict, total_size: int) -> None:
+    """Poll this task's written files to derive progress and speed.
+
+    Sums only files written by THIS task (recorded by the transfer patch)
+    — rglob'ing the whole download folder would count every album the
+    user already has, inflating the progress bar and speed.
+    """
     item["total"] = total_size
     last_bytes = 0.0
     last_time = time.time()
@@ -460,10 +470,9 @@ async def _poll_progress(item: dict, download_folder: str, total_size: int) -> N
             await asyncio.sleep(1)
             current_bytes = 0.0
             try:
-                for f in Path(download_folder).rglob("*.flac"):
-                    current_bytes += f.stat().st_size
-                for f in Path(download_folder).rglob("*.mp3"):
-                    current_bytes += f.stat().st_size
+                for f in item.get("written_files", []):
+                    if os.path.exists(f):
+                        current_bytes += os.path.getsize(f)
             except Exception:
                 pass
             current_mb = current_bytes / (1024 * 1024)

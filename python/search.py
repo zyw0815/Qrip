@@ -94,7 +94,10 @@ async def search(req: SearchRequest):
     cfg = get_config()
     client = QobuzClient(cfg)
     await client.login()
-    resp = await client.search(req.media_type, req.query, limit=req.offset + PAGE_SIZE)
+    # limit=PAGE_SIZE + offset asks Qobuz for exactly this page — no need
+    # to re-fetch every earlier page (and it keeps working past Qobuz's
+    # 500-result cap, which broke "load more" on big searches).
+    resp = await client.search(req.media_type, req.query, limit=PAGE_SIZE, offset=req.offset)
 
     # client.search() returns a list of PAGE dicts, each shaped like
     # {"albums": {"items": [...], "total": N, ...}}
@@ -110,10 +113,6 @@ async def search(req: SearchRequest):
     elif isinstance(resp, dict):
         items = resp.get(key, {}).get("items", [])
         total = resp.get(key, {}).get("total", 0)
-
-    # _paginate(limit=offset+PAGE_SIZE) returns a flat list of ALL items
-    # from 0 up to that limit — slice out the requested window.
-    items = items[req.offset : req.offset + PAGE_SIZE]
 
     results = [item_to_dict(item, req.media_type) for item in items]
     # Relevance boost: items whose title contains the query term first

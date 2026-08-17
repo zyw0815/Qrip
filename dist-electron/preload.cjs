@@ -10,4 +10,5 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     getDownloadPath: () => electron_1.ipcRenderer.invoke('get-download-path'),
     pickFolder: () => electron_1.ipcRenderer.invoke('dialog:pick-folder'),
     openExternal: (url) => electron_1.ipcRenderer.invoke('open-external', url),
+    appVersion: () => electron_1.ipcRenderer.invoke('app-version'),
 });

@@ -35,8 +35,7 @@ jobs:
         run: npm ci
 
       - name: Build Electron app (macOS dmg)
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        # afterPack hook (scripts/after-pack.cjs) ad-hoc signs the bundle
         run: npm run build:electron && npx vite build && npx electron-builder --mac dmg
 
       - name: Upload dmg

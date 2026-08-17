@@ -289,7 +289,13 @@ class QobuzClient(Client):
 
         return label_resp
 
-    async def search(self, media_type: str, query: str, limit: int = 500) -> list[dict]:
+    async def search(
+        self,
+        media_type: str,
+        query: str,
+        limit: int = 500,
+        offset: int = 0,
+    ) -> list[dict]:
         if media_type not in ("artist", "album", "track", "playlist"):
             raise Exception(f"{media_type} not available for search on qobuz")
 
@@ -298,7 +304,7 @@ class QobuzClient(Client):
         }
         epoint = f"{media_type}/search"
 
-        return await self._paginate(epoint, params, limit=limit)
+        return await self._paginate(epoint, params, limit=limit, offset=offset)
 
     async def get_featured(self, query, limit: int = 500) -> list[dict]:
         params = {
@@ -344,17 +350,21 @@ class QobuzClient(Client):
         epoint: str,
         params: dict,
         limit: int = 500,
+        offset: int = 0,
     ) -> list[dict]:
         """Paginate search results.
 
         params:
             limit: If None, all the results are yielded. Otherwise a maximum
             of `limit` results are yielded.
+            offset: Skip the first `offset` results (Qrip: paginated search).
 
         Returns
         -------
             Generator that yields (status code, response) tuples
         """
+        if offset:
+            params.update({"offset": offset})
         params.update({"limit": limit})
         status, page = await self._api_request(epoint, params)
         assert status == 200, status
@@ -363,8 +373,11 @@ class QobuzClient(Client):
         key = epoint.split("/")[0] + "s"
         items = page.get(key, {})
         total = items.get("total", 0)
-        if limit is not None and limit < total:
-            total = limit
+        # Cap how many items this call fetches: `offset` up to offset+limit.
+        # (The response's "total" field still carries the full result-set
+        # size, which Qrip uses for its "load more" counter.)
+        if limit is not None:
+            total = min(total, offset + limit)
 
         logger.debug("paginate: %d total items requested", total)
 

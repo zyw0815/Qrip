@@ -120,6 +120,7 @@ export default function SettingsTab() {
   const [embedSize, setEmbedSize] = useState(EMBED_SIZES[2])
   const [saveCover, setSaveCover] = useState(false)
   const [savedWidth, setSavedWidth] = useState(SAVED_WIDTHS[3])
+  const [version, setVersion] = useState('dev')
 
   // Dropdown open states
   const [qualityOpen, setQualityOpen] = useState(false)
@@ -145,8 +146,16 @@ export default function SettingsTab() {
         if (typeof d.embed_cover === 'boolean') setEmbedCover(d.embed_cover)
         if (d.embed_size) setEmbedSize(d.embed_size)
         if (typeof d.save_artwork === 'boolean') setSaveCover(d.save_artwork)
+        if (typeof d.saved_max_width === 'string') setSavedWidth(d.saved_max_width)
       })
       .catch(() => {})
+    // Show the real app version from Electron (browser dev shows "dev")
+    if (window.electronAPI) {
+      window.electronAPI
+        .appVersion()
+        .then((v) => { if (v) setVersion(v) })
+        .catch(() => {})
+    }
   }, [])
 
   const update = (key: string, value: string | number | boolean) => {
@@ -383,7 +392,7 @@ export default function SettingsTab() {
         <h2 className={sectionTitle}>{t('set.about')}</h2>
         <div className="flex justify-between items-center py-2 border-b border-white/[0.02]">
           <span className="text-sm text-text-muted">{t('set.version')}</span>
-          <span className="text-sm text-text-secondary">0.2.0</span>
+          <span className="text-sm text-text-secondary">{version}</span>
         </div>
         <div className="flex justify-between items-center py-2 border-b border-white/[0.02]">
           <span className="text-sm text-text-muted">{t('set.checkUpdates')}</span>
