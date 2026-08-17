@@ -19,21 +19,38 @@ function AppInner() {
 
   useEffect(() => {
     let retries = 0
+    let stopped = false
     const check = () => {
       fetch(`${API_BASE}/auth/status`)
         .then((r) => r.json())
-        .then((d) => setIsAuthenticated(d.authenticated))
+        .then((d) => { if (!stopped) setIsAuthenticated(d.authenticated) })
         .catch(() => {
-          if (retries < 20) {
-            retries++
-            setTimeout(check, 500)
-          } else {
-            setIsAuthenticated(false)
-          }
+          if (stopped) return
+          retries++
+          // The packaged backend (PyInstaller onefile) can take a while on
+          // cold start, and a leftover orphan backend can delay things
+          // further — keep trying for 60s before falling back to the login
+          // page (which self-heals via the poll below).
+          if (retries < 120) setTimeout(check, 500)
+          else setIsAuthenticated(false)
         })
     }
     check()
+    return () => { stopped = true }
   }, [])
+
+  // Self-heal: if the login page is showing but the backend later reports
+  // authenticated (e.g. it was just slow to start), jump straight in.
+  useEffect(() => {
+    if (isAuthenticated !== false) return
+    const timer = setInterval(() => {
+      fetch(`${API_BASE}/auth/status`)
+        .then((r) => r.json())
+        .then((d) => { if (d.authenticated) setIsAuthenticated(true) })
+        .catch(() => {})
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [isAuthenticated])
 
   if (isAuthenticated === null) {
     return (

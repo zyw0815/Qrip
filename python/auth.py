@@ -84,8 +84,14 @@ def get_config() -> Config:
         s.artwork.save_artwork = False
         if not s.downloads.folder:
             s.downloads.folder = os.path.expanduser("~/Music/Qrip")
-        if _load_saved_credentials(_config):
-            _logged_in = True
+        try:
+            if _load_saved_credentials(_config):
+                _logged_in = True
+        except Exception:
+            # A corrupt/partial credentials file must not break /auth/status
+            # (a 500 makes the frontend treat the backend as unavailable and
+            # give up) — treat it as "not logged in" instead.
+            _logged_in = False
     return _config
 
 
