@@ -9,6 +9,7 @@ const path_1 = __importDefault(require("path"));
 const electron_store_1 = __importDefault(require("electron-store"));
 const store = new electron_store_1.default({ name: 'qrip-config' });
 let mainWindow = null;
+let authWin = null;
 let pythonProcess = null;
 // Qobuz sends X-User-Auth-Token header on authenticated API requests.
 // Intercept it during the OAuth window's session to capture credentials.
@@ -69,7 +70,14 @@ function createWindow() {
     else {
         mainWindow.loadFile(path_1.default.join(__dirname, '..', 'dist', 'index.html'));
     }
-    mainWindow.on('closed', () => { mainWindow = null; });
+    mainWindow.on('closed', () => {
+        mainWindow = null;
+        // Closing the main window quits the app, even if the OAuth window is
+        // still open (window-all-closed wouldn't fire while it exists).
+        if (authWin && !authWin.isDestroyed())
+            authWin.close();
+        electron_1.app.quit();
+    });
 }
 // IPC Handlers
 electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
@@ -77,7 +85,7 @@ electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
         // Fresh in-memory partition every time — no cookies, no remembered
         // Google account. The user always starts from a clean login page.
         const partition = `oauth-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const authWin = new electron_1.BrowserWindow({
+        authWin = new electron_1.BrowserWindow({
             width: 1200,
             height: 800,
             title: 'Qrip — Google Login',
@@ -166,6 +174,7 @@ electron_1.ipcMain.handle('open-external', async (_e, url) => {
         return;
     await electron_1.shell.openExternal(url);
 });
+electron_1.ipcMain.handle('app-version', () => electron_1.app.getVersion());
 electron_1.app.whenReady().then(() => {
     startPython();
     createWindow();
