@@ -22,7 +22,7 @@ jobs:
       - name: Build backend binary (PyInstaller)
         working-directory: python
         run: |
-          pyinstaller --onefile --name qrip-server \
+          pyinstaller --onedir --name qrip-server \
             --add-data "../streamrip/config.toml:streamrip" \
             --paths . --paths .. server.py
 
@@ -63,7 +63,7 @@ jobs:
       - name: Build backend binary (PyInstaller)
         working-directory: python
         run: |
-          pyinstaller --onefile --name qrip-server `
+          pyinstaller --onedir --name qrip-server `
             --add-data "../streamrip/config.toml;streamrip" `
             --paths . --paths .. server.py
 
