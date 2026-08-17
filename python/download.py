@@ -8,17 +8,21 @@ import time
 from typing import Optional
 
 # streamrip is vendored inside the Qrip repo (../streamrip). Use it when
-# present so packaged builds are self-contained; fall back to the dev
-# machine path when running from a bare checkout.
+# present so source runs are self-contained; fall back to the dev machine
+# path when running from a bare checkout.
+# Packaged builds (PyInstaller): the vendored modules are embedded in the
+# binary — insert NOTHING here, or the dev-machine fallback below could
+# shadow them with an unrelated streamrip checkout (issue #70).
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_QRIP_ROOT = os.path.normpath(os.path.join(_HERE, ".."))
-# sys.path entries are search roots: importing "streamrip" looks for
-# <root>/streamrip/__init__.py, so the Qrip repo root is the entry.
-if os.path.isdir(os.path.join(_QRIP_ROOT, "streamrip", "client")):
-    STREAMRIP_PATH = _QRIP_ROOT
-else:
-    STREAMRIP_PATH = os.path.expanduser("~/Study/MyProject/streamrip")
-sys.path.insert(0, STREAMRIP_PATH)
+if not getattr(sys, "frozen", False):
+    _QRIP_ROOT = os.path.normpath(os.path.join(_HERE, ".."))
+    # sys.path entries are search roots: importing "streamrip" looks for
+    # <root>/streamrip/__init__.py, so the Qrip repo root is the entry.
+    if os.path.isdir(os.path.join(_QRIP_ROOT, "streamrip", "client")):
+        STREAMRIP_PATH = _QRIP_ROOT
+    else:
+        STREAMRIP_PATH = os.path.expanduser("~/Study/MyProject/streamrip")
+    sys.path.insert(0, STREAMRIP_PATH)
 
 from streamrip.client.qobuz import QobuzClient
 from streamrip.media.album import PendingAlbum
