@@ -6,11 +6,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const child_process_1 = require("child_process");
 const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 const electron_store_1 = __importDefault(require("electron-store"));
 const store = new electron_store_1.default({ name: 'qrip-config' });
 let mainWindow = null;
 let authWin = null;
 let pythonProcess = null;
+// All backend output goes here so users can send it for diagnostics —
+// the Electron console is invisible in packaged builds.
+function backendLogPath() {
+    return path_1.default.join(electron_1.app.getPath('userData'), 'backend.log');
+}
+let backendLog = null;
 // Qobuz sends X-User-Auth-Token header on authenticated API requests.
 // Intercept it during the OAuth window's session to capture credentials.
 function interceptQobuzAuth(session, onCaptured) {
@@ -23,6 +30,17 @@ function interceptQobuzAuth(session, onCaptured) {
     });
 }
 function startPython() {
+    // Roll the log when it grows past 1MB — it's for diagnostics, not history.
+    try {
+        if (fs_1.default.existsSync(backendLogPath()) && fs_1.default.statSync(backendLogPath()).size > 1024 * 1024) {
+            fs_1.default.writeFileSync(backendLogPath(), '[log rolled]\n');
+        }
+    }
+    catch {
+        // userData unreadable — logging will just fail silently below
+    }
+    backendLog = fs_1.default.createWriteStream(backendLogPath(), { flags: 'a' });
+    backendLog.write(`\n=== Qrip ${electron_1.app.getVersion()} (${process.platform} ${process.arch}) starting backend ===\n`);
     if (electron_1.app.isPackaged) {
         // Packaged: spawn the PyInstaller-built standalone backend binary.
         // onedir layout: resources/backend/qrip-server/qrip-server(.exe)
@@ -36,15 +54,28 @@ function startPython() {
     pythonProcess.stdout?.on('data', (data) => {
         const msg = data.toString();
         console.log(`[py] ${msg}`);
+        backendLog?.write(`[out] ${msg}`);
         if (msg.includes('Uvicorn running')) {
             mainWindow?.webContents.send('python-status', 'ready');
         }
     });
     pythonProcess.stderr?.on('data', (data) => {
-        console.error(`[py:err] ${data}`);
-        mainWindow?.webContents.send('python-status', data.toString());
+        const msg = data.toString();
+        console.error(`[py:err] ${msg}`);
+        backendLog?.write(`[err] ${msg}`);
+        mainWindow?.webContents.send('python-status', msg);
+    });
+    pythonProcess.on('error', (err) => {
+        // Spawn failure (binary missing, quarantined by AV, permissions) —
+        // without this handler Node throws an uncaught exception and the
+        // whole app crashes silently. Show the reason instead.
+        const msg = `Failed to start the backend: ${err.message}`;
+        backendLog?.write(`[err] ${msg}\n`);
+        console.error(msg);
+        electron_1.dialog.showErrorBox('Qrip — backend failed to start', `${msg}\n\nLog file: ${backendLogPath()}`);
     });
     pythonProcess.on('close', (code) => {
+        backendLog?.write(`[exit] backend exited with code ${code}\n`);
         console.log(`[py] process exited with code ${code}`);
     });
 }
@@ -93,6 +124,16 @@ electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
             },
         });
         authWin.loadURL(url);
+        // If Qobuz is unreachable (network down, region block), the main frame
+        // fails to load and the window would sit on Chromium's error page —
+        // resolve with an error marker so the login page can explain.
+        // (code -3 = ERR_ABORTED, fired on every redirect — ignore it.)
+        authWin.webContents.on('did-fail-load', (_e, code, desc, _url, isMainFrame) => {
+            if (isMainFrame && code !== -3) {
+                console.log(`[oauth] page load failed: ${code} ${desc}`);
+                finish(JSON.stringify({ error: 'load-failed', code, desc }));
+            }
+        });
         let resolved = false;
         let pollInterval = null;
         let capturedToken = '';
