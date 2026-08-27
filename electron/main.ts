@@ -1,12 +1,20 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'
 import path from 'path'
+import fs from 'fs'
 import Store from 'electron-store'
 
 const store = new Store({ name: 'qrip-config' })
 let mainWindow: BrowserWindow | null = null
 let authWin: BrowserWindow | null = null
 let pythonProcess: ChildProcess | null = null
+
+// All backend output goes here so users can send it for diagnostics —
+// the Electron console is invisible in packaged builds.
+function backendLogPath() {
+  return path.join(app.getPath('userData'), 'backend.log')
+}
+let backendLog: fs.WriteStream | null = null
 
 // Qobuz sends X-User-Auth-Token header on authenticated API requests.
 // Intercept it during the OAuth window's session to capture credentials.
@@ -24,6 +32,19 @@ function interceptQobuzAuth(session: Electron.Session, onCaptured: (token: strin
 }
 
 function startPython() {
+  // Roll the log when it grows past 1MB — it's for diagnostics, not history.
+  try {
+    if (fs.existsSync(backendLogPath()) && fs.statSync(backendLogPath()).size > 1024 * 1024) {
+      fs.writeFileSync(backendLogPath(), '[log rolled]\n')
+    }
+  } catch {
+    // userData unreadable — logging will just fail silently below
+  }
+  backendLog = fs.createWriteStream(backendLogPath(), { flags: 'a' })
+  backendLog.write(
+    `\n=== Qrip ${app.getVersion()} (${process.platform} ${process.arch}) starting backend ===\n`,
+  )
+
   if (app.isPackaged) {
     // Packaged: spawn the PyInstaller-built standalone backend binary.
     // onedir layout: resources/backend/qrip-server/qrip-server(.exe)
@@ -45,17 +66,41 @@ function startPython() {
   pythonProcess.stdout?.on('data', (data) => {
     const msg = data.toString()
     console.log(`[py] ${msg}`)
+    backendLog?.write(`[out] ${msg}`)
     if (msg.includes('Uvicorn running')) {
       mainWindow?.webContents.send('python-status', 'ready')
     }
   })
 
   pythonProcess.stderr?.on('data', (data) => {
-    console.error(`[py:err] ${data}`)
-    mainWindow?.webContents.send('python-status', data.toString())
+    const msg = data.toString()
+    console.error(`[py:err] ${msg}`)
+    backendLog?.write(`[err] ${msg}`)
+    mainWindow?.webContents.send('python-status', msg)
+  })
+
+  pythonProcess.on('error', (err) => {
+    // Spawn failure (binary missing, quarantined by AV, permissions) —
+    // without this handler Node throws an uncaught exception and the
+    // whole app crashes silently. Show the reason instead.
+    const msg = `Failed to start the backend: ${err.message}`
+    backendLog?.write(`[err] ${msg}\n`)
+    console.error(msg)
+    dialog.showErrorBox(
+      'Qrip — backend failed to start',
+      `${msg}\n\n` +
+        'Possible cause: antivirus software quarantined the backend\n' +
+        '(unsigned apps are often flagged). Restore it from your\n' +
+        'antivirus quarantine, add Qrip to the exclusions, and restart.\n\n' +
+        '常见原因：杀毒软件（如 Windows Defender）隔离了后端程序\n' +
+        '（未签名应用易被误报）。请在隔离区恢复该文件，把 Qrip\n' +
+        '安装目录加入排除项，然后重启应用。\n\n' +
+        `Log: ${backendLogPath()}`,
+    )
   })
 
   pythonProcess.on('close', (code) => {
+    backendLog?.write(`[exit] backend exited with code ${code}\n`)
     console.log(`[py] process exited with code ${code}`)
   })
 }
@@ -106,6 +151,17 @@ ipcMain.handle('open-oauth', async (_e, url: string) => {
       },
     })
     authWin.loadURL(url)
+
+    // If Qobuz is unreachable (network down, region block), the main frame
+    // fails to load and the window would sit on Chromium's error page —
+    // resolve with an error marker so the login page can explain.
+    // (code -3 = ERR_ABORTED, fired on every redirect — ignore it.)
+    authWin.webContents.on('did-fail-load', (_e, code, desc, _url, isMainFrame) => {
+      if (isMainFrame && code !== -3) {
+        console.log(`[oauth] page load failed: ${code} ${desc}`)
+        finish(JSON.stringify({ error: 'load-failed', code, desc }))
+      }
+    })
 
     let resolved = false
     let pollInterval: ReturnType<typeof setInterval> | null = null

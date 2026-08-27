@@ -131,6 +131,22 @@ Qrip 以 [GNU General Public License v3.0](LICENSE) 发布。
 
 Qrip vendor 了 [streamrip](https://github.com/nathom/streamrip) 核心库(位于 `streamrip/`),同样是 GPL-3.0 许可证——见 `streamrip/LICENSE`。
 
+## 常见问题
+
+### Windows：提示「backend failed to start」/ spawn ENOENT（或弹崩溃窗口）
+
+您的杀毒软件（最常见的是 Windows Defender）隔离了后端程序——未签名的 PyInstaller 打包程序很容易被误报。解决方法：
+
+1. 打开 **Windows 安全中心 → 病毒和威胁防护 → 保护历史**，找到 `qrip-server.exe` 点击「还原」。
+2. 将 Qrip 安装目录（如 `C:\Users\<你>\AppData\Local\Programs\Qrip`）加入 **病毒和威胁防护 → 管理设置 → 排除项 → 添加排除项 → 文件夹**。
+3. 重启 Qrip（若无法还原，重新安装）。
+
+后端的运行日志写在 `%APPDATA%\Qrip\backend.log`——反馈问题时请附上该文件。
+
+### 登录失败，报网络 / DNS 错误（如 "Could not contact DNS servers"）
+
+后端需要直连 `play.qobuz.com`。如果使用代理 / VPN，请确保它运行在 TUN / 虚拟网卡模式（对所有程序透明）——仅系统代理模式不会被后端使用。
+
 ## 免责声明
 
 我不对您使用 Qrip 的方式负责。使用 Qrip 即表示您同意 Qobuz API 的条款与条件。

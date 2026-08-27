@@ -25,7 +25,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'login.tokenBtn': 'Authenticate with Token',
     'login.errClosed': 'OAuth window closed without completing login',
     'login.errFlow': 'OAuth flow failed',
-    'login.errConn': 'Connection failed. Is the backend running?',
+    'login.errNetwork': 'Could not open the Qobuz login page — check your network or VPN',
+    'login.errConn': 'Connection failed. Check your network or proxy — Qobuz must be reachable from your region.',
     'login.errInvalid': 'Invalid token',
     'login.errFailed': 'Login failed',
 
@@ -128,7 +129,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'login.tokenBtn': 'Token 认证',
     'login.errClosed': 'OAuth 窗口关闭，未完成登录',
     'login.errFlow': 'OAuth 流程失败',
-    'login.errConn': '连接失败，后端是否在运行？',
+    'login.errNetwork': '无法打开 Qobuz 登录页 — 请检查网络或代理（你的网络需要能访问 Qobuz）',
+    'login.errConn': '连接失败。请检查网络或代理 — 你的网络必须能访问 Qobuz。',
     'login.errInvalid': 'Token 无效',
     'login.errFailed': '登录失败',
 

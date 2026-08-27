@@ -131,6 +131,22 @@ Qrip is released under the [GNU General Public License v3.0](LICENSE).
 
 Qrip vendors the [streamrip](https://github.com/nathom/streamrip) core library (in `streamrip/`), which is also GPL-3.0 licensed — see `streamrip/LICENSE`.
 
+## Troubleshooting
+
+### Windows: "backend failed to start" / spawn ENOENT (or a crash popup)
+
+Your antivirus (most commonly Windows Defender) quarantined the backend binary — unsigned apps built with PyInstaller are frequently false-flagged. To fix:
+
+1. Open **Windows Security → Virus & threat protection → Protection history**, find `qrip-server.exe` and click **Restore**.
+2. Add Qrip's install folder (e.g. `C:\Users\<you>\AppData\Local\Programs\Qrip`) to **Virus & threat protection → Manage settings → Exclusions → Add an exclusion → Folder**.
+3. Restart Qrip (reinstall if the file can't be restored).
+
+Backend diagnostics are written to `%APPDATA%\Qrip\backend.log` — attach it when reporting issues.
+
+### Login fails with a network / DNS error (e.g. "Could not contact DNS servers")
+
+The backend must reach `play.qobuz.com` directly. If you use a proxy / VPN, make sure it runs in TUN / virtual-adapter mode (transparent for all apps) — a system-proxy-only setup is not picked up by the backend.
+
 ## Disclaimer
 
 I will not be responsible for how you use Qrip. By using Qrip, you agree to the terms and conditions of the Qobuz's API.

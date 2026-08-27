@@ -27,6 +27,12 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
         let token = ''
         try {
           const parsed = JSON.parse(captured)
+          // The main process reports page-load failures (network down,
+          // region-blocked Qobuz) as {error: 'load-failed'} markers.
+          if (parsed.error) {
+            setError(t('login.errNetwork'))
+            return
+          }
           userId = parsed.userId || ''
           token = parsed.token || ''
         } catch {
