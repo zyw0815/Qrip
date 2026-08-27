@@ -21,6 +21,7 @@ export default function DownloadsTab() {
   const [queued, setQueued] = useState<DownloadItem[]>([])
   const [failed, setFailed] = useState<DownloadItem[]>([])
   const [completed, setCompleted] = useState<DownloadItem[]>([])
+  const [deleteFilesOnClear, setDeleteFilesOnClear] = useState(false)
 
   useEffect(() => {
     const poll = async () => {
@@ -51,6 +52,14 @@ export default function DownloadsTab() {
   }
   const retry = async (id: string) => {
     await fetch(`${API_BASE}/download/${id}/retry`, { method: 'POST' })
+  }
+  const clearCompleted = async () => {
+    await fetch(`${API_BASE}/download/completed/clear`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delete_files: deleteFilesOnClear }),
+    }).catch(() => {})
+    setCompleted([])
   }
 
   if (downloading.length === 0 && queued.length === 0 && failed.length === 0 && completed.length === 0) {
@@ -176,9 +185,28 @@ export default function DownloadsTab() {
       {/* Completed (this session) */}
       {completed.length > 0 && (
         <>
-          <p className="text-base text-text-muted tracking-wider mb-2.5 mt-5 font-semibold uppercase">
-            {t('dl.completed')}
-          </p>
+          <div className="flex justify-between items-center mb-2.5 mt-5">
+            <p className="text-base text-text-muted tracking-wider font-semibold uppercase">
+              {t('dl.completed')}
+            </p>
+            <div className="flex items-center gap-2.5">
+              <label className="flex items-center gap-1.5 text-[13px] text-text-muted select-none cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteFilesOnClear}
+                  onChange={(e) => setDeleteFilesOnClear(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-purple cursor-pointer"
+                />
+                {t('dl.deleteFilesToo')}
+              </label>
+              <button
+                onClick={clearCompleted}
+                className="h-8 px-3 bg-bg-input border border-border rounded-md text-[13px] text-text-secondary hover:border-red-500 hover:text-red-400 transition select-none"
+              >
+                {t('dl.clearCompleted')}
+              </button>
+            </div>
+          </div>
           {completed.map((c) => (
             <div
               key={c.item_id}
