@@ -26,11 +26,12 @@ if not getattr(sys, "frozen", False):
 
 from streamrip.client.qobuz import QobuzClient
 from streamrip.media.album import PendingAlbum
-from streamrip.media.track import PendingSingle
+from streamrip.media.track import PendingSingle, Track
 from streamrip.media.playlist import PendingPlaylist
 from streamrip.media.artwork import remove_artwork_tempdirs
 from streamrip.db import Database, Dummy
 from auth import get_config
+from verify import verify_audio
 
 # --- Pause/cancel plumbing -----------------------------------------------
 # streamrip's fast_async_download is a blocking sync loop (requests +
@@ -95,6 +96,26 @@ def _patched_fast_async_download(path, url, headers, callback):
 
 
 _dl.fast_async_download = _patched_fast_async_download
+
+
+# Track-level patch: record which path each track wrote to, so the
+# post-download verification can map files back to track ids (official
+# duration, re-download of broken tracks). Patching the class method
+# covers every reference — album, playlist and single flows all use it.
+_orig_track_download = Track.download
+
+
+async def _patched_track_download(self, *args, **kwargs):
+    await _orig_track_download(self, *args, **kwargs)
+    item = _active_item
+    if item is None:
+        return
+    track_id = getattr(getattr(self.meta, "info", None), "id", None)
+    if track_id is not None:
+        item.setdefault("track_map", {})[self.download_path] = str(track_id)
+
+
+Track.download = _patched_track_download
 
 
 def _check_cancelled(item_id: str):
@@ -403,9 +424,54 @@ async def _download_worker():
             # Clean up __artwork temp dirs created during cover embedding
             remove_artwork_tempdirs()
 
-            item["downloaded"] = item["total"] if item["total"] > 0 else total_size
-            item["status"] = "completed"
-            _completed.append(item)
+            # Verify every downloaded audio file (FLAC structure + duration
+            # vs the official Qobuz value) and re-download broken tracks
+            # individually — a single re-download lands back in the same
+            # folder/name, since it uses the same metadata and templates.
+            expected = await _fetch_expected_durations(client, item_id, media_type)
+            failures = await asyncio.to_thread(_verify_item, item, expected)
+            retries = 0
+            while failures and retries < 2:
+                retries += 1
+                for path, _ in failures:
+                    try:
+                        if os.path.exists(path):
+                            os.remove(path)
+                    except OSError:
+                        pass
+                for path, track_id in failures:
+                    _check_cancelled(item_id)
+                    single = PendingSingle(track_id, client, cfg, get_db())
+                    try:
+                        media_s = await single.resolve()
+                        if media_s is None:
+                            raise Exception("failed to resolve track")
+                        await media_s.rip()
+                    except _CancelledError:
+                        raise
+                    except Exception:
+                        pass  # still broken — the next verify reports it
+                _check_cancelled(item_id)
+                failures = await asyncio.to_thread(_verify_item, item, expected)
+
+            if failures:
+                # Broken after retries: drop the bad files, keep the good
+                # ones, and fail the item listing what's wrong.
+                for path, _ in failures:
+                    try:
+                        if os.path.exists(path):
+                            os.remove(path)
+                    except OSError:
+                        pass
+                item["status"] = "failed"
+                item["error"] = "Verification failed: " + ", ".join(
+                    os.path.basename(p) for p, _ in failures
+                )
+                _failed.append(item)
+            else:
+                item["downloaded"] = item["total"] if item["total"] > 0 else total_size
+                item["status"] = "completed"
+                _completed.append(item)
 
         except _CancelledError:
             # Final sweep once rip has fully unwound. Runs in a thread so
@@ -424,6 +490,91 @@ async def _download_worker():
             # to hand off when the item is re-queued.
 
         await asyncio.sleep(0.1)
+
+
+async def _fetch_expected_durations(
+    client: QobuzClient, item_id: str, media_type: str
+) -> dict[str, float]:
+    """Official per-track durations from Qobuz metadata ({track_id: seconds})."""
+    try:
+        if media_type == "track":
+            resp = await client.get_metadata(item_id, "track")
+            dur = resp.get("duration")
+            return {str(item_id): float(dur)} if dur else {}
+        resp = await client.get_metadata(item_id, media_type)
+        items = resp.get("tracks", {}).get("items", [])
+        return {
+            str(t["id"]): float(t["duration"])
+            for t in items
+            if t.get("id") and t.get("duration")
+        }
+    except Exception:
+        return {}
+
+
+def _verify_item(item: dict, expected: dict[str, float]) -> list[tuple[str, str]]:
+    """Verify the item's audio files. Returns [(path, track_id)] failures.
+
+    Runs in a worker thread — file I/O and CRC math never block the loop.
+    """
+    failures: list[tuple[str, str]] = []
+    track_map = item.get("track_map", {})
+    paths = list(track_map.keys())
+    if not paths:
+        # Fallback (patch didn't fire): every audio-looking written file.
+        paths = [
+            p
+            for p in item.get("written_files", [])
+            if p.lower().endswith((".flac", ".mp3"))
+        ]
+    seen = set()
+    for path in paths:
+        if path in seen:
+            continue
+        seen.add(path)
+        track_id = track_map.get(path, "")
+        if not os.path.exists(path):
+            failures.append((path, track_id))
+            continue
+        exp = expected.get(track_id) if track_id else None
+        err = verify_audio(path, exp)
+        if err:
+            failures.append((path, track_id))
+    return failures
+
+
+class ClearCompletedRequest(BaseModel):
+    delete_files: bool = False
+
+
+@router.post("/completed/clear")
+async def clear_completed(req: ClearCompletedRequest):
+    """Clear the completed list, optionally deleting the downloaded files."""
+    if req.delete_files:
+        root = _safe_root()
+        for item in _completed:
+            folder = item.get("task_folder")
+            if (
+                folder
+                and os.path.isdir(folder)
+                and root
+                and folder != root
+                and folder.startswith(root + os.sep)
+            ):
+                try:
+                    shutil.rmtree(folder)
+                except OSError:
+                    pass
+                continue
+            # Singles (folder == download root): remove only their files.
+            for f in item.get("written_files", []):
+                if f and os.path.exists(f):
+                    try:
+                        os.remove(f)
+                    except OSError:
+                        pass
+    _completed.clear()
+    return {"status": "cleared"}
 
 
 async def _estimate_size(client: QobuzClient, item_id: str, media_type: str, quality: int) -> int:
