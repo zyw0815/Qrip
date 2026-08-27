@@ -88,7 +88,14 @@ function startPython() {
     console.error(msg)
     dialog.showErrorBox(
       'Qrip — backend failed to start',
-      `${msg}\n\nLog file: ${backendLogPath()}`,
+      `${msg}\n\n` +
+        'Possible cause: antivirus software quarantined the backend\n' +
+        '(unsigned apps are often flagged). Restore it from your\n' +
+        'antivirus quarantine, add Qrip to the exclusions, and restart.\n\n' +
+        '常见原因：杀毒软件（如 Windows Defender）隔离了后端程序\n' +
+        '（未签名应用易被误报）。请在隔离区恢复该文件，把 Qrip\n' +
+        '安装目录加入排除项，然后重启应用。\n\n' +
+        `Log: ${backendLogPath()}`,
     )
   })
 
