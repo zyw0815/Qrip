@@ -32,6 +32,7 @@ from streamrip.media.artwork import remove_artwork_tempdirs
 from streamrip.db import Database, Dummy
 from auth import get_config
 from verify import verify_audio
+import proxy  # noqa: F401 — patches QobuzClient.login with system-proxy detection
 
 # --- Pause/cancel plumbing -----------------------------------------------
 # streamrip's fast_async_download is a blocking sync loop (requests +

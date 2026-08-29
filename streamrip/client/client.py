@@ -16,6 +16,12 @@ DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:83.0) Gecko/20100101 Firefox/83.0"
 )
 
+# Qrip: set by the backend after proxy detection (None = connect directly).
+# aiohttp ignores the OS proxy settings by default, so the backend probes
+# whether Qobuz is reachable directly and, if not, whether a system proxy
+# works — the winning URL lands here before any session is created.
+PROXY_URL: str | None = None
+
 
 class Client(ABC):
     source: str
@@ -63,4 +69,5 @@ class Client(ABC):
         return aiohttp.ClientSession(
             headers={"User-Agent": DEFAULT_USER_AGENT} | headers,
             connector=connector,
+            proxy=PROXY_URL,
         )
