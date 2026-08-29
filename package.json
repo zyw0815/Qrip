@@ -1,6 +1,6 @@
 {
   "name": "qrip",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Desktop GUI for downloading music from Qobuz",
   "main": "dist-electron/main.cjs",
   "type": "module",
