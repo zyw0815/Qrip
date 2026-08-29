@@ -18,7 +18,7 @@ from ..exceptions import (
     MissingCredentialsError,
     NonStreamableError,
 )
-from .client import Client
+from .client import Client, PROXY_URL
 from .downloadable import BasicDownloadable, Downloadable
 
 logger = logging.getLogger("streamrip")
@@ -132,7 +132,9 @@ class QobuzSpoofer:
         connector_kwargs = get_aiohttp_connector_kwargs(verify_ssl=True)
         connector = aiohttp.TCPConnector(**connector_kwargs)
 
-        self.session = aiohttp.ClientSession(connector=connector)
+        # PROXY_URL is a snapshot of client.PROXY_URL (Qrip's backend keeps
+        # both in sync after proxy detection).
+        self.session = aiohttp.ClientSession(connector=connector, proxy=PROXY_URL)
         return self
 
     async def __aexit__(self, *_):
