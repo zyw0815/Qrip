@@ -39,11 +39,22 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
           // Old format: raw token string
           token = captured
         }
-        const r = await fetch(`${API_BASE}/auth/login/google`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: userId, token }),
-        })
+        // Catch this fetch separately from the OAuth window above: the
+        // window runs on Chromium's network stack and the backend on
+        // Python's, so lumping both into the outer catch reported a dead
+        // backend as "OAuth flow failed" and sent users chasing the wrong
+        // layer (issue #78).
+        let r: Response
+        try {
+          r = await fetch(`${API_BASE}/auth/login/google`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId, token }),
+          })
+        } catch {
+          setError(t('login.errBackend'))
+          return
+        }
         if (r.ok) onAuthSuccess()
         else {
           const data = await r.json()
@@ -74,7 +85,10 @@ export default function LoginPage({ onAuthSuccess }: { onAuthSuccess: () => void
         setError(data.detail || t('login.errInvalid'))
       }
     } catch {
-      setError(t('login.errConn'))
+      // This fetch targets 127.0.0.1:8000, so a throw here means the
+      // backend is unreachable — not that Qobuz is. The old wording blamed
+      // the user's region/proxy for what is a local problem (issue #78).
+      setError(t('login.errBackend'))
     } finally {
       setLoading(false)
     }
