@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+import logging
 import sys
 import os
 
@@ -24,6 +25,8 @@ from streamrip.metadata.search_results import (
     SearchResults, AlbumSummary, TrackSummary, PlaylistSummary, ArtistSummary,
 )
 from auth import qobuz_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -60,15 +63,19 @@ def item_to_dict(item: dict, media_type: str) -> dict:
         released = item.get("released_at") or item.get("release_date_original") or item.get("release_date") or ""
         if isinstance(released, (int, float)):
             import datetime
-            # Pass a tz: without one, fromtimestamp() calls the platform's
-            # localtime(), and Windows' CRT rejects negative timestamps with
-            # OSError(EINVAL). Qobuz uses them for pre-1970 releases (Kind Of
-            # Blue is -327459600), and since this runs inside the result
-            # comprehension, one historic album failed the whole search with
-            # a 500 — on Windows only (issue #79).
-            released = datetime.datetime.fromtimestamp(
-                released, datetime.timezone.utc
-            ).strftime("%Y-%m-%d")
+            # Convert by arithmetic only. BOTH fromtimestamp() paths end up in
+            # the platform C library — bare it calls localtime(), with a tz it
+            # calls gmtime() — and the Windows CRT rejects negative time_t
+            # (pre-1970) with EINVAL either way, which is why v0.4.2's "pass a
+            # timezone" fix did not help. Qobuz uses negative values for
+            # historic releases (Kind Of Blue is -327459600). strftime() is
+            # avoided for the same reason: the Windows CRT refuses years < 1900.
+            try:
+                epoch = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+                d = epoch + datetime.timedelta(seconds=int(released))
+                released = f"{d.year:04d}-{d.month:02d}-{d.day:02d}"
+            except (OverflowError, ValueError, OSError):
+                released = ""
         result["year"] = str(released)[:10]
         result["tracks_count"] = item.get("tracks_count") or item.get("media_count") or 0
         result["duration"] = item.get("duration", 0)
@@ -123,7 +130,20 @@ async def search(req: SearchRequest):
         items = resp.get(key, {}).get("items", [])
         total = resp.get(key, {}).get("total", 0)
 
-    results = [item_to_dict(item, req.media_type) for item in items]
+    # Convert per item: a single malformed entry must not fail the whole
+    # search. One album with a pre-1970 release date used to 500 the entire
+    # request and drop every other result with it (issue #79).
+    results = []
+    for item in items:
+        try:
+            results.append(item_to_dict(item, req.media_type))
+        except Exception:
+            logger.warning(
+                "Skipped a %s result that could not be parsed (id=%s)",
+                req.media_type,
+                (item or {}).get("id"),
+                exc_info=True,
+            )
     # Relevance boost: items whose title contains the query term first
     if req.media_type == "track" and results:
         q = req.query.lower()
