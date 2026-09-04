@@ -20,11 +20,10 @@ if not getattr(sys, "frozen", False):
         STREAMRIP_PATH = os.path.expanduser("~/Study/MyProject/streamrip")
     sys.path.insert(0, STREAMRIP_PATH)
 
-from streamrip.client.qobuz import QobuzClient
 from streamrip.metadata.search_results import (
     SearchResults, AlbumSummary, TrackSummary, PlaylistSummary, ArtistSummary,
 )
-from auth import get_config
+from auth import qobuz_client
 
 router = APIRouter()
 
@@ -61,7 +60,15 @@ def item_to_dict(item: dict, media_type: str) -> dict:
         released = item.get("released_at") or item.get("release_date_original") or item.get("release_date") or ""
         if isinstance(released, (int, float)):
             import datetime
-            released = datetime.datetime.fromtimestamp(released).strftime("%Y-%m-%d")
+            # Pass a tz: without one, fromtimestamp() calls the platform's
+            # localtime(), and Windows' CRT rejects negative timestamps with
+            # OSError(EINVAL). Qobuz uses them for pre-1970 releases (Kind Of
+            # Blue is -327459600), and since this runs inside the result
+            # comprehension, one historic album failed the whole search with
+            # a 500 — on Windows only (issue #79).
+            released = datetime.datetime.fromtimestamp(
+                released, datetime.timezone.utc
+            ).strftime("%Y-%m-%d")
         result["year"] = str(released)[:10]
         result["tracks_count"] = item.get("tracks_count") or item.get("media_count") or 0
         result["duration"] = item.get("duration", 0)
@@ -95,13 +102,11 @@ def item_to_dict(item: dict, media_type: str) -> dict:
 
 @router.post("/query")
 async def search(req: SearchRequest):
-    cfg = get_config()
-    client = QobuzClient(cfg)
-    await client.login()
-    # limit=PAGE_SIZE + offset asks Qobuz for exactly this page — no need
-    # to re-fetch every earlier page (and it keeps working past Qobuz's
-    # 500-result cap, which broke "load more" on big searches).
-    resp = await client.search(req.media_type, req.query, limit=PAGE_SIZE, offset=req.offset)
+    async with qobuz_client() as client:
+        # limit=PAGE_SIZE + offset asks Qobuz for exactly this page — no need
+        # to re-fetch every earlier page (and it keeps working past Qobuz's
+        # 500-result cap, which broke "load more" on big searches).
+        resp = await client.search(req.media_type, req.query, limit=PAGE_SIZE, offset=req.offset)
 
     # client.search() returns a list of PAGE dicts, each shaped like
     # {"albums": {"items": [...], "total": N, ...}}
@@ -131,16 +136,14 @@ async def search(req: SearchRequest):
 @router.get("/tracks/{item_id}")
 async def get_album_tracks(item_id: str):
     """Fetch the track list for an album or playlist."""
-    cfg = get_config()
-    client = QobuzClient(cfg)
-    await client.login()
-    try:
-        resp = await client.get_metadata(item_id, "album")
-    except Exception:
+    async with qobuz_client() as client:
         try:
-            resp = await client.get_metadata(item_id, "playlist")
-        except Exception as e:
-            raise HTTPException(500, str(e))
+            resp = await client.get_metadata(item_id, "album")
+        except Exception:
+            try:
+                resp = await client.get_metadata(item_id, "playlist")
+            except Exception as e:
+                raise HTTPException(500, str(e))
 
     tracks = []
     items = resp.get("tracks", {}).get("items", []) if isinstance(resp.get("tracks"), dict) else resp.get("tracks", [])
@@ -158,24 +161,21 @@ async def get_album_tracks(item_id: str):
 @router.post("/resolve")
 async def resolve(req: ResolveRequest):
     """Parse a Qobuz URL and return metadata."""
-    cfg = get_config()
-    client = QobuzClient(cfg)
-    await client.login()
+    async with qobuz_client() as client:
+        url = req.url.strip()
+        if "/track/" in url:
+            media_type, item_id = "track", url.split("/track/")[1].split("?")[0]
+        elif "/album/" in url:
+            media_type, item_id = "album", url.split("/album/")[1].split("?")[0]
+        elif "/playlist/" in url:
+            media_type, item_id = "playlist", url.split("/playlist/")[1].split("?")[0]
+        elif "/artist/" in url:
+            media_type, item_id = "artist", url.split("/artist/")[1].split("?")[0]
+        else:
+            raise HTTPException(400, "Unsupported URL format")
 
-    url = req.url.strip()
-    if "/track/" in url:
-        media_type, item_id = "track", url.split("/track/")[1].split("?")[0]
-    elif "/album/" in url:
-        media_type, item_id = "album", url.split("/album/")[1].split("?")[0]
-    elif "/playlist/" in url:
-        media_type, item_id = "playlist", url.split("/playlist/")[1].split("?")[0]
-    elif "/artist/" in url:
-        media_type, item_id = "artist", url.split("/artist/")[1].split("?")[0]
-    else:
-        raise HTTPException(400, "Unsupported URL format")
-
-    try:
-        resp = await client.get_metadata(item_id, media_type)
-        return {"type": media_type, "data": item_to_dict(resp, media_type)}
-    except Exception as e:
-        raise HTTPException(500, str(e))
+        try:
+            resp = await client.get_metadata(item_id, media_type)
+            return {"type": media_type, "data": item_to_dict(resp, media_type)}
+        except Exception as e:
+            raise HTTPException(500, str(e))

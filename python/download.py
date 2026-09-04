@@ -30,7 +30,7 @@ from streamrip.media.track import PendingSingle, Track
 from streamrip.media.playlist import PendingPlaylist
 from streamrip.media.artwork import remove_artwork_tempdirs
 from streamrip.db import Database, Dummy
-from auth import get_config
+from auth import get_config, close_client
 from verify import verify_audio
 import proxy  # noqa: F401 — patches QobuzClient.login with system-proxy detection
 
@@ -351,6 +351,7 @@ async def _download_worker():
         quality = item["quality"]
         _downloading[item_id] = item
         _active_item = item
+        client = None
         try:
             cfg = get_config()
             # Serial downloads — one track at a time (like streamrip CLI)
@@ -487,6 +488,10 @@ async def _download_worker():
             _downloading.pop(item_id, None)
             _active_item = None
             _rip_tasks.pop(item_id, None)
+            # The worker outlives every rip, so an unclosed session here
+            # leaks for the whole process lifetime (issue #77).
+            if client is not None:
+                await close_client(client)
             # Keep pause/cancel events — background cleanup tasks watch them
             # to hand off when the item is re-queued.
 

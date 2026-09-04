@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 import sys
 import os
 import json
@@ -157,6 +158,31 @@ def get_config() -> Config:
     return _config
 
 
+async def close_client(client) -> None:
+    """Close a QobuzClient's aiohttp session.
+
+    streamrip opens the session in login() and never closes it, so every
+    request leaked a session plus its pooled connections — the backend log
+    filled up with "Unclosed client session" (issue #77).
+    """
+    session = getattr(client, "session", None)
+    if session is not None and not session.closed:
+        await session.close()
+
+
+@asynccontextmanager
+async def qobuz_client():
+    """A logged-in QobuzClient whose session is closed on every exit path."""
+    from streamrip.client.qobuz import QobuzClient
+
+    client = QobuzClient(get_config())
+    await client.login()
+    try:
+        yield client
+    finally:
+        await close_client(client)
+
+
 @router.get("/status")
 async def auth_status():
     # Trigger credential loading from disk if not yet initialized
@@ -208,8 +234,13 @@ async def login_google(req: GoogleLoginRequest):
 
 @router.post("/logout")
 async def logout():
-    global _logged_in
+    global _logged_in, _config
     _logged_in = False
+    # Drop the in-memory config as well. app_id/secrets live on it, and
+    # QobuzClient.login only re-fetches them when *both* are empty — keeping
+    # the singleton made a re-login reuse stale values and skip the spoofer,
+    # so logging out and back in could not recover from bad ones (issue #77).
+    _config = None
     # Clear saved credentials
     try:
         os.remove(_QRIP_CONFIG_PATH)
