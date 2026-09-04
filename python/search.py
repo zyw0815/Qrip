@@ -60,7 +60,15 @@ def item_to_dict(item: dict, media_type: str) -> dict:
         released = item.get("released_at") or item.get("release_date_original") or item.get("release_date") or ""
         if isinstance(released, (int, float)):
             import datetime
-            released = datetime.datetime.fromtimestamp(released).strftime("%Y-%m-%d")
+            # Pass a tz: without one, fromtimestamp() calls the platform's
+            # localtime(), and Windows' CRT rejects negative timestamps with
+            # OSError(EINVAL). Qobuz uses them for pre-1970 releases (Kind Of
+            # Blue is -327459600), and since this runs inside the result
+            # comprehension, one historic album failed the whole search with
+            # a 500 — on Windows only (issue #79).
+            released = datetime.datetime.fromtimestamp(
+                released, datetime.timezone.utc
+            ).strftime("%Y-%m-%d")
         result["year"] = str(released)[:10]
         result["tracks_count"] = item.get("tracks_count") or item.get("media_count") or 0
         result["duration"] = item.get("duration", 0)
