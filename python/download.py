@@ -5,6 +5,8 @@ import os
 import asyncio
 import shutil
 import time
+import copy
+import logging
 from typing import Optional
 
 # streamrip is vendored inside the Qrip repo (../streamrip). Use it when
@@ -33,6 +35,8 @@ from streamrip.db import Database, Dummy
 from auth import get_config, close_client
 from verify import verify_audio
 import proxy  # noqa: F401 — patches QobuzClient.login with system-proxy detection
+
+logger = logging.getLogger(__name__)
 
 # --- Pause/cancel plumbing -----------------------------------------------
 # streamrip's fast_async_download is a blocking sync loop (requests +
@@ -72,7 +76,9 @@ def _patched_fast_async_download(path, url, headers, callback):
     item["current_file"] = path
     # Track every file this task writes — cancelled albums leave one small
     # chunk per track, and the sweep removes them all.
-    item.setdefault("written_files", []).append(path)
+    written_files = item.setdefault("written_files", [])
+    if path not in written_files:
+        written_files.append(path)
     # Record the task's folder so cancel can wipe it. The artwork transfer
     # runs before album resolution finishes — its __artwork temp folder is
     # cleaned separately and must never become the task folder.
@@ -114,6 +120,23 @@ async def _patched_track_download(self, *args, **kwargs):
     track_id = getattr(getattr(self.meta, "info", None), "id", None)
     if track_id is not None:
         item.setdefault("track_map", {})[self.download_path] = str(track_id)
+        # Record before postprocess embeds tags/artwork and changes size.
+        # A full response plus valid FLAC frames can distinguish inaccurate
+        # catalogue duration from an incomplete transfer (issue #81).
+        expected_size = getattr(self.downloadable, "_size", 0) or 0
+        try:
+            received_size = os.path.getsize(self.download_path)
+        except OSError:
+            received_size = 0
+        complete = expected_size > 0 and received_size == expected_size
+        item.setdefault("transfer_complete", {})[self.download_path] = complete
+        transfer_errors = item.setdefault("transfer_errors", {})
+        if expected_size > 0 and received_size != expected_size:
+            transfer_errors[self.download_path] = (
+                f"incomplete transfer: received {received_size} of {expected_size} bytes"
+            )
+        else:
+            transfer_errors.pop(self.download_path, None)
 
 
 Track.download = _patched_track_download
@@ -352,8 +375,12 @@ async def _download_worker():
         _downloading[item_id] = item
         _active_item = item
         client = None
+        _progress_poll = None
         try:
-            cfg = get_config()
+            # Settings can change while this task is running. Estimate,
+            # transfer and retries must all use the queued quality (#80).
+            cfg = copy.deepcopy(get_config())
+            cfg.session.qobuz.quality = quality
             # Serial downloads — one track at a time (like streamrip CLI)
             cfg.session.downloads.concurrency = False
             # Disable rich terminal progress bars (we poll files instead)
@@ -416,8 +443,6 @@ async def _download_worker():
                 # The cancel endpoint aborted rip_task. The task is done —
                 # fall through; _check_cancelled below triggers the cleanup.
                 pass
-            finally:
-                _progress_poll.cancel()
 
             # Album/playlist internals swallow exceptions, so a cancelled
             # rip can complete normally — check the flag explicitly.
@@ -433,45 +458,47 @@ async def _download_worker():
             expected = await _fetch_expected_durations(client, item_id, media_type)
             failures = await asyncio.to_thread(_verify_item, item, expected)
             retries = 0
+            retry_errors = {}
             while failures and retries < 2:
                 retries += 1
-                for path, _ in failures:
+                for path, _, _ in failures:
                     try:
                         if os.path.exists(path):
                             os.remove(path)
                     except OSError:
                         pass
-                for path, track_id in failures:
+                for path, track_id, _ in failures:
                     _check_cancelled(item_id)
-                    single = PendingSingle(track_id, client, cfg, get_db())
                     try:
-                        media_s = await single.resolve()
-                        if media_s is None:
-                            raise Exception("failed to resolve track")
-                        await media_s.rip()
+                        await _redownload_track(path, track_id, media, client, cfg)
+                        retry_errors.pop(path, None)
                     except _CancelledError:
                         raise
-                    except Exception:
-                        pass  # still broken — the next verify reports it
+                    except Exception as exc:
+                        retry_errors[path] = str(exc)
+                        logger.exception("Retry %d failed for %s", retries, path)
                 _check_cancelled(item_id)
                 failures = await asyncio.to_thread(_verify_item, item, expected)
 
             if failures:
                 # Broken after retries: drop the bad files, keep the good
                 # ones, and fail the item listing what's wrong.
-                for path, _ in failures:
+                for path, _, _ in failures:
                     try:
                         if os.path.exists(path):
                             os.remove(path)
                     except OSError:
                         pass
                 item["status"] = "failed"
-                item["error"] = "Verification failed: " + ", ".join(
-                    os.path.basename(p) for p, _ in failures
+                item["error"] = "Verification failed:\n" + "\n".join(
+                    f"{os.path.basename(path)}: {reason}"
+                    + (f"; retry failed: {retry_errors[path]}" if path in retry_errors else "")
+                    for path, _, reason in failures
                 )
+                logger.error("%s: %s", item["name"], item["error"])
                 _failed.append(item)
             else:
-                item["downloaded"] = item["total"] if item["total"] > 0 else total_size
+                _update_size(item)
                 item["status"] = "completed"
                 _completed.append(item)
 
@@ -485,6 +512,9 @@ async def _download_worker():
             item["error"] = str(e)
             _failed.append(item)
         finally:
+            if _progress_poll is not None:
+                _progress_poll.cancel()
+                await asyncio.gather(_progress_poll, return_exceptions=True)
             _downloading.pop(item_id, None)
             _active_item = None
             _rip_tasks.pop(item_id, None)
@@ -518,12 +548,34 @@ async def _fetch_expected_durations(
         return {}
 
 
-def _verify_item(item: dict, expected: dict[str, float]) -> list[tuple[str, str]]:
-    """Verify the item's audio files. Returns [(path, track_id)] failures.
+async def _redownload_track(path, track_id, media, client, cfg):
+    """Retry using the original album/playlist metadata and output path (#81)."""
+    if not track_id:
+        raise ValueError("missing track ID for re-download")
+    pending = next(
+        (p for p in getattr(media, "tracks", []) if str(p.id) == track_id),
+        None,
+    )
+    if pending is None:
+        pending = PendingSingle(track_id, client, cfg, get_db())
+    track = await pending.resolve()
+    if track is None:
+        raise ValueError(f"failed to resolve track {track_id}")
+    # PendingSingle may otherwise retry into a different album directory;
+    # playlist filenames can also depend on their original position.
+    track.folder = os.path.dirname(path)
+    await track.preprocess()
+    track.download_path = path
+    await track.download()
+    await track.postprocess()
+
+
+def _verify_item(item: dict, expected: dict[str, float]) -> list[tuple[str, str, str]]:
+    """Verify audio files. Returns [(path, track_id, reason)] failures.
 
     Runs in a worker thread — file I/O and CRC math never block the loop.
     """
-    failures: list[tuple[str, str]] = []
+    failures: list[tuple[str, str, str]] = []
     track_map = item.get("track_map", {})
     paths = list(track_map.keys())
     if not paths:
@@ -540,12 +592,18 @@ def _verify_item(item: dict, expected: dict[str, float]) -> list[tuple[str, str]
         seen.add(path)
         track_id = track_map.get(path, "")
         if not os.path.exists(path):
-            failures.append((path, track_id))
-            continue
-        exp = expected.get(track_id) if track_id else None
-        err = verify_audio(path, exp)
+            err = "file missing"
+        elif path in item.get("transfer_errors", {}):
+            err = item["transfer_errors"][path]
+        else:
+            exp = expected.get(track_id) if track_id else None
+            err = verify_audio(
+                path, exp,
+                transfer_complete=item.get("transfer_complete", {}).get(path, False),
+            )
         if err:
-            failures.append((path, track_id))
+            logger.warning("Verification failed for track %s (%s): %s", track_id, path, err)
+            failures.append((path, track_id, err))
     return failures
 
 
@@ -583,7 +641,7 @@ async def clear_completed(req: ClearCompletedRequest):
     return {"status": "cleared"}
 
 
-async def _estimate_size(client: QobuzClient, item_id: str, media_type: str, quality: int) -> int:
+async def _estimate_size(client: QobuzClient, item_id: str, media_type: str, quality: int) -> float:
     """Estimate total download size in MB by summing track sizes.
 
     Playlists are skipped: each get_downloadable call is rate-limited
@@ -597,26 +655,49 @@ async def _estimate_size(client: QobuzClient, item_id: str, media_type: str, qua
             downloadables = [await client.get_downloadable(item_id, quality)]
         else:
             resp = await client.get_metadata(item_id, media_type)
-            track_ids = [t.get("id") for t in resp.get("tracks", {}).get("items", [])]
+            tracks = resp.get("tracks", {})
+            track_ids = [t.get("id") for t in tracks.get("items", [])]
+            count = resp.get("tracks_count", tracks.get("total", len(track_ids)))
+            if not track_ids or len(track_ids) != count or not all(track_ids):
+                return 0
             downloadables = []
-            for tid in track_ids[:500]:
-                try:
-                    downloadables.append(await client.get_downloadable(str(tid), quality))
-                except Exception:
-                    pass
+            for tid in track_ids:
+                downloadables.append(await client.get_downloadable(str(tid), quality))
 
         total_bytes = 0
         for d in downloadables:
-            try:
-                total_bytes += await d.size()
-            except Exception:
-                pass
+            size = await d.size()
+            if size <= 0:
+                return 0
+            total_bytes += size
         return round(total_bytes / (1024 * 1024), 1)
-    except Exception:
+    except Exception as exc:
+        # A partial sum is not the task's total. Leave it unknown rather
+        # than making progress exceed 100% when another lookup fails (#80).
+        logger.info("Total size unavailable for %s: %s", item_id, exc)
         return 0
 
 
-async def _poll_progress(item: dict, total_size: int) -> None:
+def _update_size(item: dict) -> float:
+    """Current audio size in MiB, counting each output path once (#80)."""
+    current_bytes = 0
+    for path in set(item.get("written_files", [])):
+        if not path.lower().endswith((".flac", ".mp3")):
+            continue
+        try:
+            current_bytes += os.path.getsize(path)
+        except OSError:
+            pass
+    current_mb = current_bytes / (1024 * 1024)
+    item["downloaded"] = round(current_mb, 1)
+    if item.get("total", 0) > 0 and item["downloaded"] > item["total"]:
+        # Embedded artwork/tags can also make final files exceed their
+        # transfer sizes. Stop presenting that estimate as a known total.
+        item["total"] = 0
+    return current_mb
+
+
+async def _poll_progress(item: dict, total_size: float) -> None:
     """Poll this task's written files to derive progress and speed.
 
     Sums only files written by THIS task (recorded by the transfer patch)
@@ -629,18 +710,10 @@ async def _poll_progress(item: dict, total_size: int) -> None:
     try:
         while True:
             await asyncio.sleep(1)
-            current_bytes = 0.0
-            try:
-                for f in item.get("written_files", []):
-                    if os.path.exists(f):
-                        current_bytes += os.path.getsize(f)
-            except Exception:
-                pass
-            current_mb = current_bytes / (1024 * 1024)
+            current_mb = _update_size(item)
             now = time.time()
             delta_time = now - last_time
-            speed = (current_mb - last_bytes) / delta_time if delta_time > 0 else 0
-            item["downloaded"] = round(current_mb, 1)
+            speed = max(0, (current_mb - last_bytes) / delta_time) if delta_time > 0 else 0
             item["speed"] = f"{speed:.1f}"
             last_bytes = current_mb
             last_time = now
