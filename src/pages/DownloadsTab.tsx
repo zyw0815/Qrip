@@ -170,6 +170,12 @@ export default function DownloadsTab() {
                 <div className="text-base text-red-400/90 truncate mt-0.5">
                   {f.error || t('dl.failed')}
                 </div>
+                {f.error && (
+                  <details className="mt-1 text-sm text-red-400/90">
+                    <summary className="cursor-pointer select-none">{t('dl.errorDetails')}</summary>
+                    <div className="mt-2 whitespace-pre-wrap break-words">{f.error}</div>
+                  </details>
+                )}
               </div>
               <button
                 onClick={() => retry(f.item_id)}

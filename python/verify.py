@@ -21,7 +21,10 @@ Runs in a worker thread from download.py — never on the event loop.
 
 import mmap
 import os
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # --- CRC tables (FLAC polynomials, non-reflected, init 0) -------------------
 
@@ -225,6 +228,8 @@ def _verify_flac_mm(mm: mmap.mmap) -> Optional[str]:
         btype = mm[pos] & 0x7F
         blen = int.from_bytes(mm[pos + 1 : pos + 4], "big")
         pos += 4
+        if pos + blen > n:
+            return "truncated metadata"
         if btype == 0 and blen >= 34:
             b = mm[pos : pos + 34]
             max_frame_size = int.from_bytes(b[7:10], "big")
@@ -244,7 +249,7 @@ def _verify_flac_mm(mm: mmap.mmap) -> Optional[str]:
     fixed_block: Optional[int] = None  # fixed-block streams: the constant block size
     while True:
         if p >= n:
-            return None
+            return "incomplete stream (no audio frames)"
         if p + 2 > n:
             tail = mm[p:n]
             return None if (len(tail) <= 8 and not any(tail)) else "trailing garbage"
@@ -305,12 +310,19 @@ def audio_duration(path: str) -> Optional[float]:
         return None
 
 
-def verify_audio(path: str, expected_duration: Optional[float] = None) -> Optional[str]:
+def verify_audio(
+    path: str, expected_duration: Optional[float] = None, *, transfer_complete: bool = False
+) -> Optional[str]:
     """Full check for one audio file. Returns an error description or None.
 
     FLAC gets the structural CRC walk; MP3 gets a duration check only
     (MP3 has no cheap integrity code). Duration is compared against the
     official Qobuz value when available (±2s tolerance).
+
+    Catalogue durations can be inaccurate (#81: an intact 247.150s FLAC
+    is advertised as 245s). For structurally valid FLAC only, a transfer
+    matching the server's full Content-Length makes that discrepancy a
+    metadata warning. CRC/truncation errors still fail unconditionally.
     """
     ext = os.path.splitext(path)[1].lower()
     if ext == ".flac":
@@ -322,8 +334,12 @@ def verify_audio(path: str, expected_duration: Optional[float] = None) -> Option
         if actual is None:
             return "cannot read duration"
         if abs(actual - expected_duration) > 2:
-            return (
+            err = (
                 f"duration mismatch: actual {actual:.1f}s vs "
                 f"official {expected_duration:.1f}s"
             )
+            if ext == ".flac" and transfer_complete:
+                logger.warning("Catalogue %s for complete, structurally valid FLAC %s", err, path)
+                return None
+            return err
     return None
