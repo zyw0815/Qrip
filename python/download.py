@@ -7,6 +7,7 @@ import shutil
 import time
 import copy
 import logging
+import http.client
 from typing import Optional
 
 # streamrip is vendored inside the Qrip repo (../streamrip). Use it when
@@ -37,6 +38,11 @@ from verify import verify_audio
 import proxy  # noqa: F401 — patches QobuzClient.login with system-proxy detection
 
 logger = logging.getLogger(__name__)
+
+# Some audio responses contain 104 headers (repeated CDN forwarding
+# headers), exceeding requests/http.client's default 100 before any audio
+# is read. Retain a finite limit while accepting those responses (#82).
+http.client._MAXHEADERS = max(http.client._MAXHEADERS, 256)
 
 # --- Pause/cancel plumbing -----------------------------------------------
 # streamrip's fast_async_download is a blocking sync loop (requests +
@@ -99,7 +105,19 @@ def _patched_fast_async_download(path, url, headers, callback):
     # fast_async_download is a coroutine — run it on a fresh loop inside
     # the worker thread so the event loop stays responsive.
     coro = _orig_fast_async_download(path, url, headers, cb)
-    return asyncio.to_thread(asyncio.run, coro)
+
+    async def transfer():
+        try:
+            await asyncio.to_thread(asyncio.run, coro)
+        except Exception as exc:
+            # Track.download catches transfer errors itself. Preserve the
+            # cause so a failed retry doesn't become a tagger error (#82).
+            item.setdefault("download_errors", {})[path] = str(exc)
+            raise
+        else:
+            item.get("download_errors", {}).pop(path, None)
+
+    return transfer()
 
 
 _dl.fast_async_download = _patched_fast_async_download
@@ -135,8 +153,17 @@ async def _patched_track_download(self, *args, **kwargs):
             transfer_errors[self.download_path] = (
                 f"incomplete transfer: received {received_size} of {expected_size} bytes"
             )
+        elif received_size == 0:
+            transfer_errors[self.download_path] = "empty download"
         else:
             transfer_errors.pop(self.download_path, None)
+        if self.download_path in transfer_errors:
+            cause = item.get("download_errors", {}).get(self.download_path)
+            if cause:
+                transfer_errors[self.download_path] += f"; download failed: {cause}"
+            # The vendored downloader returns normally after both retries
+            # fail. Abort before postprocess tries to tag an empty file.
+            raise RuntimeError(transfer_errors[self.download_path])
 
 
 Track.download = _patched_track_download
