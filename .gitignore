@@ -6,6 +6,11 @@ __pycache__/
 .DS_Store
 .claude/
 CLAUDE.md
+.codex/
+.Codex/
+AGENTS.md
+AGENTS.override.md
+codex-clipboard-*
 .gitignore
 python/dist/
 python/build/
