@@ -34,6 +34,12 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Test backend metadata and recovery
+        run: python -m unittest discover -s python -p "test_*.py"
+
+      - name: Test desktop lifecycle
+        run: npm run test:electron
+
       - name: Build Electron app (macOS dmg)
         # afterPack hook (scripts/after-pack.cjs) ad-hoc signs the bundle
         run: npm run build:electron && npx vite build && npx electron-builder --mac dmg
@@ -74,6 +80,12 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Test backend metadata and recovery
+        run: python -m unittest discover -s python -p "test_*.py"
+
+      - name: Test desktop lifecycle
+        run: npm run test:electron
 
       - name: Build Electron app (Windows nsis)
         env:

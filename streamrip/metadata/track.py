@@ -4,10 +4,22 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
-from .album import AlbumMetadata
+from .album import AlbumMetadata, format_copyright
 from .util import safe_get, typed
 
 logger = logging.getLogger("streamrip")
+
+
+def qobuz_producers(performers: str | None) -> str | None:
+    """Keep named producer credits without confusing composers with producers (#83)."""
+    names = []
+    for credit in (performers or "").split(" - "):
+        name, _, roles = credit.partition(", ")
+        if any(role.strip().casefold() in {"producer", "co-producer", "coproducer"}
+               for role in roles.split(",")):
+            if name.strip() and name.strip() not in names:
+                names.append(name.strip())
+    return "; ".join(names) or None
 
 
 @dataclass(slots=True)
@@ -33,6 +45,10 @@ class TrackMetadata:
     composer: str | None
     isrc: str | None = None
     lyrics: str | None = ""
+    copyright: str | None = None
+    involved_people: str | None = None
+    producer: str | None = None
+    itunesadvisory: int | None = None
 
     @classmethod
     def from_qobuz(cls, album: AlbumMetadata, resp: dict) -> TrackMetadata | None:
@@ -64,8 +80,8 @@ class TrackMetadata:
         track_id = str(resp["id"])
         bit_depth = typed(resp.get("maximum_bit_depth"), int | None)
         sampling_rate = typed(resp.get("maximum_sampling_rate"), int | float | None)
-        # Is the info included?
-        explicit = False
+        explicit = bool(resp.get("parental_warning", album.info.explicit))
+        performers = resp.get("performers") or None
 
         info = TrackInfo(
             id=track_id,
@@ -84,6 +100,10 @@ class TrackMetadata:
             discnumber=discnumber,
             composer=composer,
             isrc=isrc,
+            copyright=format_copyright(resp.get("copyright") or None),
+            involved_people=performers,
+            producer=qobuz_producers(performers),
+            itunesadvisory=1 if explicit else 0,
         )
 
     @classmethod

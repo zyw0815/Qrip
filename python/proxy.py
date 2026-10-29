@@ -115,8 +115,36 @@ _orig_login = QobuzClient.login
 
 
 async def _patched_login(self):
+    global _detected, _proxy
     await ensure_proxy_detected()
-    return await _orig_login(self)
+    try:
+        return await _orig_login(self)
+    except (aiohttp.ClientError, TimeoutError):
+        # A reachability probe can pass while the real authenticated
+        # request is reset. Retry through an OS proxy once in that case;
+        # never retry rejected credentials or other application errors (#84).
+        session = getattr(self, "session", None)
+        if session is not None and not session.closed:
+            await session.close()
+        if _proxy is not None:
+            _detected = False
+            _proxy = None
+            _sr_client.PROXY_URL = None
+            import streamrip.client.qobuz as _qobuz
+            _qobuz.PROXY_URL = None
+            raise
+        for url in _system_proxies():
+            if not await _can_reach(url):
+                continue
+            _proxy = url
+            _detected = True
+            _sr_client.PROXY_URL = url
+            import streamrip.client.qobuz as _qobuz
+            _qobuz.PROXY_URL = url
+            logger.info("Direct Qobuz login failed — retrying with the system proxy")
+            return await _orig_login(self)
+        _detected = False
+        raise
 
 
 QobuzClient.login = _patched_login

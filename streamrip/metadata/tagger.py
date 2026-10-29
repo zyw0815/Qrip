@@ -88,12 +88,28 @@ METADATA_TYPES = (
     "disctotal",
     "date",
     "isrc",
+    "label",
+    "publisher",
+    "upc",
+    "media_type",
+    "involved_people",
+    "producer",
+    "itunesadvisory",
 )
 
 
 FLAC_KEY = {v: v.upper() for v in METADATA_TYPES}
+FLAC_KEY.update(media_type="MEDIATYPE", involved_people="INVOLVEDPEOPLE")
 MP4_KEY = dict(zip(METADATA_TYPES, MP4_KEYS))
 MP3_KEY = dict(zip(METADATA_TYPES, MP3_KEYS))
+MP3_KEY["publisher"] = id3.TPUB
+EXTRA_TAGS = {
+    "label": "LABEL", "upc": "UPC", "media_type": "MEDIATYPE",
+    "involved_people": "INVOLVEDPEOPLE", "producer": "PRODUCER",
+    "itunesadvisory": "ITUNESADVISORY",
+}
+MP4_KEY.update({k: f"----:com.apple.iTunes:{v}" for k, v in EXTRA_TAGS.items()})
+MP4_KEY.update(publisher="----:com.apple.iTunes:PUBLISHER", itunesadvisory="rtng")
 
 
 class Container(Enum):
@@ -152,6 +168,11 @@ class Container(Enum):
 
             if text is not None and v is not None:
                 out.append((v.__name__, v(encoding=3, text=text)))
+        for attr, description in EXTRA_TAGS.items():
+            text = self._attr_from_meta(meta, attr)
+            if text is not None:
+                frame = id3.TXXX(encoding=3, desc=description, text=text)
+                out.append((frame.HashKey, frame))
         return out
 
     def _tag_mp4(self, meta: TrackMetadata):
@@ -166,14 +187,26 @@ class Container(Enum):
                 # we have to pass in the actual bytes to mutagen
                 # See mutagen.MP4Tags.__render_freeform
                 text = meta.isrc.encode("utf-8")
+            elif k == "itunesadvisory":
+                text = [meta.itunesadvisory] if meta.itunesadvisory is not None else None
             else:
                 text = self._attr_from_meta(meta, k)
+                if v and v.startswith("----:") and text is not None:
+                    text = text.encode("utf-8")
 
             if v is not None and text is not None:
                 out.append((v, text))
         return out
 
     def _attr_from_meta(self, meta: TrackMetadata, attr: str) -> str | None:
+        if attr == "copyright":
+            # The recording's rights notice can differ from the album's
+            # artwork/compilation notice; prefer the track notice (#83).
+            return meta.copyright or meta.album.get_copyright()
+        if attr in {"label", "publisher"}:
+            # PUBLISHER follows the release-label convention of tag editors;
+            # no separate songwriting publisher is inferred from credits.
+            return meta.album.info.label or None
         # TODO: verify this works
         in_trackmetadata = {
             "title",
@@ -184,6 +217,9 @@ class Container(Enum):
             "composer",
             "isrc",
             "lyrics",
+            "involved_people",
+            "producer",
+            "itunesadvisory",
         }
         if attr in in_trackmetadata:
             if attr == "album":
@@ -195,8 +231,6 @@ class Container(Enum):
         else:
             if attr == "genre":
                 return meta.album.get_genres()
-            elif attr == "copyright":
-                return meta.album.get_copyright()
             val = getattr(meta.album, attr)
             if val is None:
                 return None

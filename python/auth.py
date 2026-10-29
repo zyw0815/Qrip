@@ -176,8 +176,8 @@ async def qobuz_client():
     from streamrip.client.qobuz import QobuzClient
 
     client = QobuzClient(get_config())
-    await client.login()
     try:
+        await client.login()
         yield client
     finally:
         await close_client(client)
@@ -206,6 +206,8 @@ async def login_token(req: TokenLoginRequest):
         await client.login()
     except Exception as e:
         raise HTTPException(401, str(e))
+    finally:
+        await close_client(client)
     _save_credentials(cfg)
     _logged_in = True
     return {"status": "ok"}
@@ -227,6 +229,8 @@ async def login_google(req: GoogleLoginRequest):
         await client.login()
     except Exception as e:
         raise HTTPException(401, str(e))
+    finally:
+        await close_client(client)
     _save_credentials(cfg)
     _logged_in = True
     return {"status": "ok"}

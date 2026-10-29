@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import aiohttp
 import copy
 import logging
 import uvicorn
@@ -37,6 +39,26 @@ app.include_router(download_router, prefix="/download")
 app.include_router(config_router, prefix="/config")
 
 
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "qrip"}
+
+
+@app.exception_handler(Exception)
+async def request_failed(request: Request, exc: Exception):
+    # Plain-text 500 responses made the UI's r.json() fail and report a
+    # dead backend even when only Qobuz was unreachable (issue #84).
+    logging.getLogger(__name__).error("Request failed: %s", request.url.path, exc_info=exc)
+    upstream = isinstance(exc, (aiohttp.ClientError, TimeoutError))
+    return JSONResponse(
+        status_code=502 if upstream else 500,
+        content={"detail": (
+            "Could not connect to Qobuz. Check your network or system proxy."
+            if upstream else "The request failed. See backend.log for details."
+        )},
+    )
+
+
 class _SkipPollingFilter(logging.Filter):
     """Drop access-log lines for the endpoints the UI polls continuously.
 
@@ -46,7 +68,7 @@ class _SkipPollingFilter(logging.Filter):
     (electron/main.ts), that noise is what evicts the actual stack traces.
     """
 
-    _NOISY = ("/auth/status", "/download/status")
+    _NOISY = ("/auth/status", "/download/status", "/health")
 
     def filter(self, record: logging.LogRecord) -> bool:
         message = record.getMessage()
