@@ -9,9 +9,13 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const electron_store_1 = __importDefault(require("electron-store"));
 const store = new electron_store_1.default({ name: 'qrip-config' });
+const hasInstanceLock = electron_1.app.requestSingleInstanceLock();
 let mainWindow = null;
 let authWin = null;
 let pythonProcess = null;
+let quitting = false;
+let backendRestarts = 0;
+let restartTimer = null;
 // All backend output goes here so users can send it for diagnostics —
 // the Electron console is invisible in packaged builds.
 function backendLogPath() {
@@ -30,16 +34,22 @@ function interceptQobuzAuth(session, onCaptured) {
     });
 }
 function startPython() {
+    if (quitting || pythonProcess)
+        return;
     // Roll the log when it grows past 1MB — it's for diagnostics, not history.
-    try {
-        if (fs_1.default.existsSync(backendLogPath()) && fs_1.default.statSync(backendLogPath()).size > 1024 * 1024) {
-            fs_1.default.writeFileSync(backendLogPath(), '[log rolled]\n');
+    if (!backendLog) {
+        try {
+            if (fs_1.default.existsSync(backendLogPath()) && fs_1.default.statSync(backendLogPath()).size > 1024 * 1024) {
+                fs_1.default.writeFileSync(backendLogPath(), '[log rolled]\n');
+            }
         }
+        catch {
+            // userData unreadable — logging will just fail silently below
+        }
+        backendLog = fs_1.default.createWriteStream(backendLogPath(), { flags: 'a' });
+        // A diagnostic log failure must not crash the desktop app (#84).
+        backendLog.on('error', (err) => console.error('Backend log unavailable:', err.message));
     }
-    catch {
-        // userData unreadable — logging will just fail silently below
-    }
-    backendLog = fs_1.default.createWriteStream(backendLogPath(), { flags: 'a' });
     backendLog.write(`\n=== Qrip ${electron_1.app.getVersion()} (${process.platform} ${process.arch}) starting backend ===\n`);
     if (electron_1.app.isPackaged) {
         // Packaged: spawn the PyInstaller-built standalone backend binary.
@@ -51,21 +61,39 @@ function startPython() {
         // Dev: use the conda env python directly.
         pythonProcess = (0, child_process_1.spawn)('/opt/anaconda3/envs/music/bin/python3', [path_1.default.join(__dirname, '..', 'python', 'server.py')], { env: { ...process.env, PYTHONUNBUFFERED: '1' } });
     }
-    pythonProcess.stdout?.on('data', (data) => {
+    const child = pythonProcess;
+    let spawnFailed = false;
+    let portConflict = false;
+    let ready = false;
+    const checkReady = (msg) => {
+        if (!ready && msg.includes('Uvicorn running')) {
+            ready = true;
+            mainWindow?.webContents.send('python-status', 'ready');
+            if (backendRestarts > 0) {
+                void electron_1.dialog.showMessageBox({
+                    type: 'warning', title: 'Qrip — backend restarted',
+                    message: 'The backend was restarted. Please re-add any unfinished downloads.\n后端已恢复，未完成的下载请重新加入队列。',
+                }).catch(console.error);
+            }
+        }
+    };
+    child.stdout?.on('data', (data) => {
         const msg = data.toString();
         console.log(`[py] ${msg}`);
         backendLog?.write(`[out] ${msg}`);
-        if (msg.includes('Uvicorn running')) {
-            mainWindow?.webContents.send('python-status', 'ready');
-        }
+        checkReady(msg);
     });
-    pythonProcess.stderr?.on('data', (data) => {
+    child.stderr?.on('data', (data) => {
         const msg = data.toString();
         console.error(`[py:err] ${msg}`);
         backendLog?.write(`[err] ${msg}`);
+        if (/address already in use|EADDRINUSE|10048|Errno (48|98)/i.test(msg))
+            portConflict = true;
+        checkReady(msg); // Uvicorn reports readiness on stderr, not stdout (#84).
         mainWindow?.webContents.send('python-status', msg);
     });
-    pythonProcess.on('error', (err) => {
+    child.on('error', (err) => {
+        spawnFailed = true;
         // Spawn failure (binary missing, quarantined by AV, permissions) —
         // without this handler Node throws an uncaught exception and the
         // whole app crashes silently. Show the reason instead.
@@ -81,10 +109,50 @@ function startPython() {
             '安装目录加入排除项，然后重启应用。\n\n' +
             `Log: ${backendLogPath()}`);
     });
-    pythonProcess.on('close', (code) => {
-        backendLog?.write(`[exit] backend exited with code ${code}\n`);
+    child.on('close', (code, signal) => {
+        if (pythonProcess !== child)
+            return;
+        pythonProcess = null;
+        backendLog?.write(`[exit] backend exited with code ${code}, signal ${signal}\n`);
         console.log(`[py] process exited with code ${code}`);
+        if (quitting || spawnFailed || !mainWindow)
+            return;
+        if (!portConflict && backendRestarts < 2) {
+            backendRestarts++;
+            backendLog?.write(`[restart] restarting backend (${backendRestarts}/2)\n`);
+            mainWindow.webContents.send('python-status', 'restarting');
+            restartTimer = setTimeout(() => { restartTimer = null; startPython(); }, 1000);
+            return;
+        }
+        mainWindow.webContents.send('python-status', 'failed');
+        electron_1.dialog.showErrorBox('Qrip — backend stopped', portConflict
+            ? `Port 8000 is already in use. Close other Qrip instances and restart.\n端口 8000 已被占用，请退出其他 Qrip 实例后重试。\n\nLog: ${backendLogPath()}`
+            : `The backend stopped and could not recover (exit ${code}, signal ${signal}).\n后端异常退出，自动恢复未成功，请重启应用并提供日志。\n\nLog: ${backendLogPath()}`);
     });
+}
+function stopPython() {
+    quitting = true;
+    if (restartTimer)
+        clearTimeout(restartTimer);
+    const child = pythonProcess;
+    pythonProcess = null;
+    if (!child || child.exitCode !== null)
+        return;
+    try {
+        if (process.platform === 'win32' && child.pid) {
+            // PyInstaller can own a descendant server process. Kill only our
+            // spawned tree so it cannot keep port 8000 after exit (#84).
+            (0, child_process_1.execFileSync)('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+                stdio: 'ignore', windowsHide: true, timeout: 5000,
+            });
+        }
+        else {
+            child.kill();
+        }
+    }
+    catch (err) {
+        console.error('Backend cleanup failed:', err);
+    }
 }
 function createWindow() {
     mainWindow = new electron_1.BrowserWindow({
@@ -130,7 +198,8 @@ electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
                 partition,
             },
         });
-        authWin.loadURL(url);
+        const oauthWindow = authWin;
+        const oauthSession = oauthWindow.webContents.session;
         // If Qobuz is unreachable (network down, region block), the main frame
         // fails to load and the window would sit on Chromium's error page —
         // resolve with an error marker so the login page can explain.
@@ -150,12 +219,15 @@ electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
             resolved = true;
             if (pollInterval)
                 clearInterval(pollInterval);
-            authWin.webContents.session.webRequest.onBeforeSendHeaders(null);
-            authWin.removeAllListeners();
-            if (!authWin.isDestroyed())
-                authWin.close();
+            oauthSession.webRequest.onBeforeSendHeaders(null);
+            oauthWindow.removeAllListeners();
+            if (!oauthWindow.isDestroyed())
+                oauthWindow.close();
             // Drop the session's in-memory data so nothing lingers.
-            authWin.webContents.session.clearStorageData();
+            // BrowserWindow.webContents is already destroyed after close (#84).
+            void oauthSession.clearStorageData().catch(console.error);
+            if (authWin === oauthWindow)
+                authWin = null;
             resolve(token);
         };
         // Capture X-User-Auth-Token from any authenticated Qobuz API call.
@@ -195,6 +267,9 @@ electron_1.ipcMain.handle('open-oauth', async (_e, url) => {
             }
         }, 2000);
         authWin.on('closed', () => finish(null));
+        // did-fail-load above supplies the user-visible error marker; consume
+        // the matching rejected load promise instead of leaving it unhandled.
+        void oauthWindow.loadURL(url).catch(() => { });
     });
 });
 electron_1.ipcMain.handle('store:get', (_e, key) => store.get(key));
@@ -222,14 +297,22 @@ electron_1.ipcMain.handle('open-external', async (_e, url) => {
     await electron_1.shell.openExternal(url);
 });
 electron_1.ipcMain.handle('app-version', () => electron_1.app.getVersion());
-electron_1.app.whenReady().then(() => {
-    startPython();
-    createWindow();
+electron_1.app.on('second-instance', () => {
+    if (!mainWindow)
+        return;
+    if (mainWindow.isMinimized())
+        mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
 });
-electron_1.app.on('window-all-closed', () => {
-    pythonProcess?.kill();
+if (!hasInstanceLock) {
     electron_1.app.quit();
-});
-electron_1.app.on('before-quit', () => {
-    pythonProcess?.kill();
-});
+}
+else {
+    void electron_1.app.whenReady().then(() => {
+        startPython();
+        createWindow();
+    });
+}
+electron_1.app.on('window-all-closed', () => electron_1.app.quit());
+electron_1.app.on('before-quit', stopPython);
