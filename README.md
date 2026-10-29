@@ -42,10 +42,12 @@ Requirements:
 - **High-res downloads**: up to 24-bit / 192 kHz FLAC, quality configurable in settings.
 - **Album track list**: expand an album to see every track and download individual ones.
 - **Live progress**: per-item progress bars, speed and queue management on the Downloads tab — pause / resume / delete, with partial files cleaned up when you cancel.
-- **No database, no dedup**: everything is always downloadable; existing files are simply overwritten.
+- **No database, no dedup**: available tracks can always be downloaded again; existing files are simply overwritten.
 - **Sensible defaults**: `{artist} — {album} ({year})` folder layout, `{artist} — {title}` file names, cover embedded in the audio files.
 - **Naming templates**: pick from presets or assemble your own from tokens, with a live preview.
 - **Cover art options**: embed in audio files, optionally save `cover.jpg` separately.
+- **Rich metadata**: preserve Qobuz's track copyright, performer credits, producer, label, UPC, release type and content rating when supplied, alongside the usual tags and cover art.
+- **Backend recovery**: reopening the app focuses the existing window; unexpected backend exits are detected and retried, with clear diagnostics if recovery fails. Re-add unfinished downloads after a backend restart.
 - **Extensible design**: Qobuz-only today, but the architecture keeps the door open for more sources.
 
 ## Screenshots
