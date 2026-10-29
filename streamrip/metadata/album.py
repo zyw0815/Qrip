@@ -15,6 +15,13 @@ COPYRIGHT = "\u00a9"
 logger = logging.getLogger("streamrip")
 
 
+def format_copyright(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = re.sub(r"(?i)\(P\)", PHON_COPYRIGHT, value)
+    return re.sub(r"(?i)\(C\)", COPYRIGHT, value)
+
+
 genre_clean = re.compile(r"([^\u2192\/]+)")
 
 
@@ -50,17 +57,14 @@ class AlbumMetadata:
     grouping: str | None = None
     lyrics: str | None = None
     purchase_date: str | None = None
+    upc: str | None = None
+    media_type: str | None = None
 
     def get_genres(self) -> str:
         return ", ".join(self.genre)
 
     def get_copyright(self) -> str | None:
-        if self.copyright is None:
-            return None
-        # Add special chars
-        _copyright = re.sub(r"(?i)\(P\)", PHON_COPYRIGHT, self.copyright)
-        _copyright = re.sub(r"(?i)\(C\)", COPYRIGHT, _copyright)
-        return _copyright
+        return format_copyright(self.copyright)
 
     def format_folder_path(self, formatter: str) -> str:
         # Available keys: "albumartist", "title", "year", "bit_depth", "sampling_rate",
@@ -156,6 +160,8 @@ class AlbumMetadata:
             lyrics=None,
             purchase_date=None,
             tracktotal=tracktotal,
+            upc=str(resp["upc"]) if resp.get("upc") else None,
+            media_type=resp.get("release_type") or resp.get("product_type"),
         )
 
     @classmethod
