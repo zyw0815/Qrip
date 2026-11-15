@@ -70,7 +70,7 @@ class DownloadSizeTests(unittest.IsolatedAsyncioTestCase):
     async def test_retry_keeps_original_path_and_playlist_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
             original = os.path.join(directory, "Disc 2", "07 — track.flac")
-            track = SimpleNamespace(folder="wrong", download_path="wrong")
+            track = SimpleNamespace(folder="wrong", download_path="wrong", meta=SimpleNamespace(title="Track"))
             track.preprocess = AsyncMock()
             track.download = AsyncMock()
             track.postprocess = AsyncMock()
@@ -140,7 +140,7 @@ class DownloadSizeTests(unittest.IsolatedAsyncioTestCase):
                     await asyncio.gather(worker, return_exceptions=True)
 
     async def test_worker_reports_failure_reason_and_retry_exception(self):
-        item = {"item_id": "bad", "media_type": "track", "quality": 2, "status": "queued", "total": 0}
+        item = {"item_id": "bad", "media_type": "track", "quality": 4, "status": "queued", "total": 0}
         cfg = Config.defaults()
         client = SimpleNamespace(login=AsyncMock())
         media = SimpleNamespace(meta=SimpleNamespace(title="Broken", album=None), rip=AsyncMock())
@@ -172,6 +172,97 @@ class DownloadSizeTests(unittest.IsolatedAsyncioTestCase):
                 finally:
                     worker.cancel()
                     await asyncio.gather(worker, return_exceptions=True)
+
+
+class DownloadRecoveryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_single_short_transfer_falls_back_once_and_requires_verification(self):
+        for cd_is_valid in (True, False):
+            with self.subTest(cd_is_valid=cd_is_valid), tempfile.TemporaryDirectory() as directory:
+                path = str(Path(directory) / "Touch It.flac")
+                item = {
+                    "item_id": "7", "media_type": "track", "quality": 4, "status": "queued",
+                    "track_map": {path: "7"}, "written_files": [path],
+                    "transfer_errors": {path: "short response"}, "short_responses": {path: True},
+                }
+                cfg = Config.defaults()
+                cfg.session.qobuz.quality = 4
+                completed, failed, attempts, phases = [], [], [], []
+                client = SimpleNamespace(login=AsyncMock())
+                media = SimpleNamespace(
+                    meta=SimpleNamespace(title="Touch It", album=None),
+                    rip=AsyncMock(side_effect=d._IncompleteTransferError("short response")),
+                )
+
+                async def retry(_path, _track, _media, _client, settings, *, use_cd):
+                    attempts.append((settings.session.qobuz.quality, use_cd))
+                    phases.append(item["phase"])
+                    if use_cd:
+                        return "Touch It"
+                    raise d._IncompleteTransferError("short response")
+
+                def verify(_item, _expected, *, paths=None):
+                    phases.append(item["phase"])
+                    self.assertEqual(paths, {path} if attempts else None)
+                    if len(attempts) < 3:
+                        return [(path, "7", "short response")]
+                    return [] if cd_is_valid else [(path, "7", "corrupt FLAC")]
+
+                with patch.object(d, "get_config", return_value=cfg), \
+                     patch.object(d, "QobuzClient", return_value=client), \
+                     patch.object(d, "PendingSingle", return_value=SimpleNamespace(resolve=AsyncMock(return_value=media))), \
+                     patch.object(d, "_estimate_size", new=AsyncMock(return_value=0)), \
+                     patch.object(d, "_fetch_expected_durations", new=AsyncMock(return_value={})), \
+                     patch.object(d, "_redownload_track", side_effect=retry), \
+                     patch.object(d, "_verify_item", side_effect=verify), \
+                     patch.object(d, "remove_artwork_tempdirs"), \
+                     patch.object(d, "close_client", new=AsyncMock()), \
+                     patch.object(d, "_download_queue", [item]), \
+                     patch.object(d, "_downloading", {}), \
+                     patch.object(d, "_completed", completed), \
+                     patch.object(d, "_failed", failed), \
+                     self.assertLogs(d.logger, level="ERROR"):
+                    worker = asyncio.create_task(d._download_worker())
+                    try:
+                        await wait_for_result(completed if cd_is_valid else failed)
+                        self.assertEqual(attempts, [(4, False), (4, False), (2, True)])
+                        self.assertEqual(phases, [
+                            "verifying", "retrying", "verifying", "retrying",
+                            "verifying", "cd_retry", "verifying",
+                        ])
+                        self.assertEqual(cfg.session.qobuz.quality, 4)
+                        if cd_is_valid:
+                            self.assertEqual(completed[0]["cd_fallbacks"], [
+                                {"path": "Touch It.flac", "title": "Touch It"},
+                            ])
+                        else:
+                            self.assertFalse(failed[0]["cd_fallbacks"])
+                            self.assertIn("corrupt FLAC", failed[0]["error"])
+                    finally:
+                        worker.cancel()
+                        await asyncio.gather(worker, return_exceptions=True)
+
+    async def test_delete_failed_keeps_good_replaced_and_unowned_files(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(d, "_failed", []):
+            good, bad, reused, unowned = (Path(directory) / name for name in (
+                "good.flac", "bad.flac", "reused.flac", "other.flac",
+            ))
+            for file in (good, bad, reused, unowned):
+                file.write_bytes(b"original")
+            item = {"item_id": "7", "written_files": [str(file) for file in (good, bad, reused)]}
+            d._record_failure(item, map(str, (bad, reused, unowned)))
+            reused.write_bytes(b"new complete file")
+            with patch.object(d, "_active_item", {"written_files": [str(bad)]}):
+                with self.assertRaises(d.HTTPException) as error:
+                    await d.delete_failed_download(item["failure_id"])
+                self.assertEqual(error.exception.status_code, 409)
+                self.assertTrue(bad.exists())
+            with patch.object(d, "_active_item", None):
+                await d.delete_failed_download(item["failure_id"])
+            self.assertFalse(d._failed)
+            self.assertFalse(bad.exists())
+            self.assertTrue(good.exists())
+            self.assertTrue(unowned.exists())
+            self.assertEqual(reused.read_bytes(), b"new complete file")
 
 
 if __name__ == "__main__":

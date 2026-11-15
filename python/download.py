@@ -1,14 +1,19 @@
-from fastapi import APIRouter
+from dataclasses import replace
+from collections.abc import Iterable
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from requests.exceptions import ChunkedEncodingError
 import sys
 import os
 import asyncio
 import shutil
+import stat
 import time
 import copy
 import logging
 import http.client
 from typing import Optional
+from uuid import uuid4
 
 # streamrip is vendored inside the Qrip repo (../streamrip). Use it when
 # present so source runs are self-contained; fall back to the dev machine
@@ -73,6 +78,10 @@ class _CancelledError(BaseException):
     """Raised mid-transfer when the user cancels the download."""
 
 
+class _IncompleteTransferError(RuntimeError):
+    """An audio download ended before the file was complete."""
+
+
 def _patched_fast_async_download(path, url, headers, callback):
     item = _active_item
     if item is None:
@@ -107,12 +116,16 @@ def _patched_fast_async_download(path, url, headers, callback):
     coro = _orig_fast_async_download(path, url, headers, cb)
 
     async def transfer():
+        short_responses = item.setdefault("short_responses", {})
+        short_responses.pop(path, None)
         try:
             await asyncio.to_thread(asyncio.run, coro)
         except Exception as exc:
             # Track.download catches transfer errors itself. Preserve the
             # cause so a failed retry doesn't become a tagger error (#82).
             item.setdefault("download_errors", {})[path] = str(exc)
+            if isinstance(exc, ChunkedEncodingError):
+                short_responses[path] = True
             raise
         else:
             item.get("download_errors", {}).pop(path, None)
@@ -163,7 +176,7 @@ async def _patched_track_download(self, *args, **kwargs):
                 transfer_errors[self.download_path] += f"; download failed: {cause}"
             # The vendored downloader returns normally after both retries
             # fail. Abort before postprocess tries to tag an empty file.
-            raise RuntimeError(transfer_errors[self.download_path])
+            raise _IncompleteTransferError(transfer_errors[self.download_path])
 
 
 Track.download = _patched_track_download
@@ -286,12 +299,16 @@ class DownloadRequest(BaseModel):
 @router.post("/add")
 async def add_to_queue(req: DownloadRequest):
     q = get_config().session.qobuz.quality if req.quality is None else req.quality
-    # Clear stale pause/cancel state (e.g. re-queuing after a cancel) and
-    # bump the generation so old cleanup tasks hand off to this new run.
-    _pause_events.setdefault(req.item_id, asyncio.Event()).clear()
-    _cancel_events.setdefault(req.item_id, asyncio.Event()).clear()
-    _item_gen[req.item_id] = _item_gen.get(req.item_id, 0) + 1
     async with _queue_lock:
+        if req.item_id in _downloading or any(
+            pending["item_id"] == req.item_id and pending["status"] == "queued"
+            for pending in _download_queue
+        ):
+            return {"status": "already_queued"}
+        # Only a new run may clear pause/cancel state and supersede cleanup.
+        _pause_events.setdefault(req.item_id, asyncio.Event()).clear()
+        _cancel_events.setdefault(req.item_id, asyncio.Event()).clear()
+        _item_gen[req.item_id] = _item_gen.get(req.item_id, 0) + 1
         item = {
             "item_id": req.item_id, "media_type": req.media_type,
             "quality": q, "status": "queued",
@@ -340,7 +357,7 @@ async def cancel_download(item_id: str):
     async with _queue_lock:
         item = _downloading.pop(item_id, None)
         for i, q in enumerate(_download_queue):
-            if q["item_id"] == item_id:
+            if q is item or (q["item_id"] == item_id and q["status"] == "queued"):
                 _download_queue.pop(i)
                 break
     _cancel_events.setdefault(item_id, asyncio.Event()).set()
@@ -365,13 +382,66 @@ async def cancel_download(item_id: str):
 @router.post("/{item_id}/retry")
 async def retry_download(item_id: str):
     for f in _failed:
-        if f["item_id"] == item_id:
-            _failed.remove(f)
-            return await add_to_queue(DownloadRequest(
-                item_id=item_id, media_type=f.get("media_type", "track"),
+        if item_id in (f["item_id"], f.get("failure_id")):
+            result = await add_to_queue(DownloadRequest(
+                item_id=f["item_id"], media_type=f.get("media_type", "track"),
                 quality=f.get("quality"),
             ))
+            if result["status"] == "queued" and f in _failed:
+                _failed.remove(f)
+            return result
     return {"status": "not_found"}
+
+
+def _file_signature(path: str) -> tuple | None:
+    info = os.lstat(path)
+    if stat.S_ISREG(info.st_mode):
+        return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+    return None
+
+
+def _record_failure(item: dict, paths):
+    # A later task can write to the same path. Check file identity again
+    # when deleting leftovers from this failed run (#87).
+    remaining = {}
+    for path in set(paths).intersection(item.get("written_files", ())):
+        try:
+            signature = _file_signature(path)
+            if signature is not None:
+                remaining[path] = signature
+        except OSError:
+            continue
+    item["failed_files"] = remaining
+    item["failure_id"] = uuid4().hex
+    item["status"] = "failed"
+    _failed.append(item)
+
+
+@router.delete("/failed/{failure_id}")
+async def delete_failed_download(failure_id: str):
+    for item in _failed:
+        if item["failure_id"] != failure_id:
+            continue
+        active_paths = {
+            os.path.normcase(os.path.realpath(path))
+            for path in (_active_item or {}).get("written_files", ())
+        }
+        for path, signature in list(item["failed_files"].items()):
+            if os.path.normcase(os.path.realpath(path)) in active_paths:
+                continue
+            try:
+                if _file_signature(path) == signature:
+                    os.unlink(path)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                continue
+            del item["failed_files"][path]
+        if item["failed_files"]:
+            raise HTTPException(409, "Some failed files could not be removed")
+        _failed.remove(item)
+        return {"status": "deleted"}
+    raise HTTPException(404, "Failed download not found")
 
 
 def start_worker():
@@ -470,42 +540,90 @@ async def _download_worker():
                 # The cancel endpoint aborted rip_task. The task is done —
                 # fall through; _check_cancelled below triggers the cleanup.
                 pass
+            except _IncompleteTransferError:
+                # A single track propagates this error. Collections catch
+                # it themselves, but both must reach the same retry logic.
+                pass
 
             # Album/playlist internals swallow exceptions, so a cancelled
             # rip can complete normally — check the flag explicitly.
             _check_cancelled(item_id)
 
-            # Clean up __artwork temp dirs created during cover embedding
-            remove_artwork_tempdirs()
-
             # Verify every downloaded audio file (FLAC structure + duration
             # vs the official Qobuz value) and re-download broken tracks
             # individually — a single re-download lands back in the same
             # folder/name, since it uses the same metadata and templates.
+            item["phase"] = "verifying"
             expected = await _fetch_expected_durations(client, item_id, media_type)
             failures = await asyncio.to_thread(_verify_item, item, expected)
-            retries = 0
+            _check_cancelled(item_id)
             retry_errors = {}
-            while failures and retries < 2:
-                retries += 1
-                for path, _, _ in failures:
+            cd_errors = {}
+            cd_tracks = {}
+            retry_qualities = (quality, quality, 2) if quality > 2 else (quality, quality)
+            for attempt, retry_quality in enumerate(retry_qualities, 1):
+                use_cd = retry_quality != quality
+                targets = failures
+                if use_cd:
+                    targets = [
+                        row for row in failures
+                        if row[1] and row[0] in item.get("transfer_errors", {})
+                        and item.get("short_responses", {}).get(row[0])
+                    ]
+                if not targets:
+                    break
+                _check_cancelled(item_id)
+                retry_cfg = cfg
+                if use_cd:
+                    retry_cfg = copy.deepcopy(cfg)
+                    retry_cfg.session.qobuz.quality = retry_quality
+                    item["total"] = 0  # The original byte estimate is no longer applicable.
+                item["phase"] = "cd_retry" if use_cd else "retrying"
+                for path, _, _ in targets:
                     try:
                         if os.path.exists(path):
                             os.remove(path)
                     except OSError:
                         pass
-                for path, track_id, _ in failures:
+                for path, track_id, _ in targets:
                     _check_cancelled(item_id)
                     try:
-                        await _redownload_track(path, track_id, media, client, cfg)
-                        retry_errors.pop(path, None)
+                        title = await _redownload_track(
+                            path, track_id, media, client, retry_cfg, use_cd=use_cd,
+                        )
+                        if use_cd:
+                            cd_tracks[path] = title
+                        else:
+                            retry_errors.pop(path, None)
                     except _CancelledError:
                         raise
                     except Exception as exc:
-                        retry_errors[path] = str(exc)
-                        logger.exception("Retry %d failed for %s", retries, path)
+                        if use_cd:
+                            cd_errors[path] = (path, track_id, str(exc))
+                        else:
+                            retry_errors[path] = str(exc)
+                        logger.exception("Retry %d failed for %s", attempt, path)
                 _check_cancelled(item_id)
-                failures = await asyncio.to_thread(_verify_item, item, expected)
+                item["phase"] = "verifying"
+                retried_paths = {path for path, _, _ in targets}
+                # Files which already passed were never touched by this retry.
+                failures = [row for row in failures if row[0] not in retried_paths]
+                failures.extend(await asyncio.to_thread(
+                    _verify_item, item, expected, paths=retried_paths,
+                ))
+                _check_cancelled(item_id)
+
+            # Report only tracks that passed validation after a full CD retry.
+            unverified = {path for path, _, _ in failures}
+            failures.extend(
+                (path, row[1], "CD download could not finish")
+                for path, row in cd_errors.items() if path not in unverified
+            )
+            if cd_tracks:
+                item["cd_fallbacks"] = [
+                    {"path": os.path.basename(path), "title": title}
+                    for path, title in cd_tracks.items() if path not in unverified
+                ]
 
             if failures:
                 # Broken after retries: drop the bad files, keep the good
@@ -516,14 +634,14 @@ async def _download_worker():
                             os.remove(path)
                     except OSError:
                         pass
-                item["status"] = "failed"
                 item["error"] = "Verification failed:\n" + "\n".join(
                     f"{os.path.basename(path)}: {reason}"
                     + (f"; retry failed: {retry_errors[path]}" if path in retry_errors else "")
+                    + (f"; CD retry failed: {cd_errors[path][2]}" if path in cd_errors else "")
                     for path, _, reason in failures
                 )
                 logger.error("%s: %s", item["name"], item["error"])
-                _failed.append(item)
+                _record_failure(item, (path for path, _, _ in failures))
             else:
                 _update_size(item)
                 item["status"] = "completed"
@@ -535,10 +653,13 @@ async def _download_worker():
             await asyncio.to_thread(_cleanup_partial, item)
             item["status"] = "cancelled"
         except Exception as e:
-            item["status"] = "failed"
             item["error"] = str(e)
-            _failed.append(item)
+            _record_failure(item, item.get("transfer_errors", {}))
         finally:
+            try:
+                remove_artwork_tempdirs()  # Retries still need the embedded artwork.
+            except OSError:
+                logger.warning("Could not remove temporary artwork", exc_info=True)
             if _progress_poll is not None:
                 _progress_poll.cancel()
                 await asyncio.gather(_progress_poll, return_exceptions=True)
@@ -575,7 +696,7 @@ async def _fetch_expected_durations(
         return {}
 
 
-async def _redownload_track(path, track_id, media, client, cfg):
+async def _redownload_track(path, track_id, media, client, cfg, *, use_cd=False) -> str:
     """Retry using the original album/playlist metadata and output path (#81)."""
     if not track_id:
         raise ValueError("missing track ID for re-download")
@@ -585,6 +706,8 @@ async def _redownload_track(path, track_id, media, client, cfg):
     )
     if pending is None:
         pending = PendingSingle(track_id, client, cfg, get_db())
+    elif use_cd:
+        pending = replace(pending, config=cfg)
     track = await pending.resolve()
     if track is None:
         raise ValueError(f"failed to resolve track {track_id}")
@@ -595,19 +718,21 @@ async def _redownload_track(path, track_id, media, client, cfg):
     track.download_path = path
     await track.download()
     await track.postprocess()
+    return track.meta.title
 
 
-def _verify_item(item: dict, expected: dict[str, float]) -> list[tuple[str, str, str]]:
+def _verify_item(
+    item: dict, expected: dict[str, float], *, paths: Iterable[str] | None = None,
+) -> list[tuple[str, str, str]]:
     """Verify audio files. Returns [(path, track_id, reason)] failures.
 
     Runs in a worker thread — file I/O and CRC math never block the loop.
     """
     failures: list[tuple[str, str, str]] = []
     track_map = item.get("track_map", {})
-    paths = list(track_map.keys())
-    if not paths:
+    if paths is None:
         # Fallback (patch didn't fire): every audio-looking written file.
-        paths = [
+        paths = track_map or [
             p
             for p in item.get("written_files", [])
             if p.lower().endswith((".flac", ".mp3"))
