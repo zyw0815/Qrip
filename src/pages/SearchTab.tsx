@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import SearchResultCard from '../components/SearchResultCard'
 import { API_BASE } from '../App'
 import { useI18n } from '../i18n'
@@ -16,7 +16,10 @@ interface Result {
   cover?: string
 }
 
-export default function SearchTab() {
+export default function SearchTab({ busyIds, onQueued }: {
+  busyIds: ReadonlySet<string>
+  onQueued: (origin: DOMRect) => void
+}) {
   const { t } = useI18n()
   const [mode, setMode] = useState<Mode>('url')
   // Separate state per mode — switching modes preserves both sides
@@ -112,22 +115,30 @@ export default function SearchTab() {
     }
   }
 
-  const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
+  const adding = useRef(new Set<string>())
+  const [addingIds, setAddingIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-  const [trackLists, setTrackLists] = useState<Map<string, { id: string; title: string; artist: string; added: boolean }[]>>(new Map())
+  const [trackLists, setTrackLists] = useState<Map<string, { id: string; title: string; artist: string }[]>>(new Map())
 
-  const addToQueue = async (result: Result) => {
+  const addToQueue = async (id: string, type: Result['type'], origin: DOMRect) => {
+    if (adding.current.has(id) || busyIds.has(id)) return
+    adding.current.add(id)
+    setAddingIds(new Set(adding.current))
+    setError('')
     try {
       const r = await fetch(`${API_BASE}/download/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item_id: result.id, media_type: result.type }),
+        body: JSON.stringify({ item_id: id, media_type: type }),
       })
-      if (r.ok) {
-        setAddedIds((prev) => new Set(prev).add(result.id))
-      }
+      if (!r.ok) throw new Error()
+      const response = await r.json()
+      if (response.status === 'queued') onQueued(origin)
     } catch {
       setError(t('search.errAdd'))
+    } finally {
+      adding.current.delete(id)
+      setAddingIds(new Set(adding.current))
     }
   }
 
@@ -145,10 +156,7 @@ export default function SearchTab() {
       const r = await fetch(`${API_BASE}/search/tracks/${result.id}`)
       if (r.ok) {
         const data = await r.json()
-        const tracks = (data.tracks || []).map((x: { id: string; title: string; artist: string }) => ({
-          ...x,
-          added: addedIds.has(x.id),
-        }))
+        const tracks = data.tracks || []
         setTrackLists((prev) => new Map(prev).set(result.id, tracks))
         setExpandedIds((prev) => new Set(prev).add(result.id))
       }
@@ -269,14 +277,15 @@ export default function SearchTab() {
             key={`${r.id}-${i}`}
             {...r}
             selected={i === 0}
-            added={addedIds.has(r.id)}
+            adding={addingIds.has(r.id)}
+            added={busyIds.has(r.id)}
             expanded={expandedIds.has(r.id)}
-            tracks={trackLists.get(r.id)}
-            onDownload={() => addToQueue(r)}
+            tracks={trackLists.get(r.id)?.map((track) => ({
+              ...track, adding: addingIds.has(track.id), added: busyIds.has(track.id),
+            }))}
+            onDownload={(origin) => addToQueue(r.id, r.type, origin)}
             onView={() => toggleView(r)}
-            onTrackDownload={(trackId) =>
-              addToQueue({ id: trackId, type: 'track', title: '', artist: '', meta: [], qualityTags: [] })
-            }
+            onTrackDownload={(trackId, origin) => addToQueue(trackId, 'track', origin)}
           />
         ))}
       </div>

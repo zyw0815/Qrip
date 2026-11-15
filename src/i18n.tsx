@@ -10,6 +10,7 @@ const translations: Record<Lang, Record<string, string>> = {
     // Tabs
     'tab.search': 'Search',
     'tab.downloads': 'Downloads',
+    'tab.downloadActivity': 'Downloads ({active} active, {queued} queued)',
     'tab.settings': 'Settings',
 
     // Login
@@ -61,17 +62,25 @@ const translations: Record<Lang, Record<string, string>> = {
     'dl.empty': 'No downloads yet',
     'dl.emptyHint': 'Search for music or paste a URL to get started',
     'dl.downloading': 'Downloading — {n} active',
+    'dl.verifying': 'Verifying files…',
+    'dl.retrying': 'Retrying at the original quality…',
+    'dl.retryingCd': 'Retrying with CD quality…',
+    'dl.cdFallback': '{track} · Downloaded in CD quality (FLAC 16-bit / 44.1 kHz)',
     'dl.queued': 'Queued',
     'dl.failed': 'Failed',
     'dl.errorDetails': 'Show error details',
     'dl.completed': 'Completed',
     'dl.retry': '↻ Retry',
+    'dl.retryError': 'Could not retry this download.',
+    'dl.alreadyQueued': 'This download is already in progress or queued.',
     'dl.clearCompleted': '✕ Clear',
     'dl.deleteFilesToo': 'Delete files too',
     'dl.pausedLabel': '⏸ Paused',
     'dl.pause': '⏸ Pause',
     'dl.resume': '▶ Resume',
     'dl.delete': '✕ Delete',
+    'dl.deleteFailedHint': 'Remove this failed task and its incomplete files',
+    'dl.deleteFailedError': 'Could not remove the failed download. Close any app using its files and try again.',
 
     // Settings
     'set.general': 'General',
@@ -108,6 +117,8 @@ const translations: Record<Lang, Record<string, string>> = {
 
     // Search result card
     'card.download': 'Download',
+    'card.adding': 'Adding…',
+    'card.added': '✓ Added',
     'card.view': 'View ▾',
     'card.hide': 'Hide ▴',
   },
@@ -118,6 +129,7 @@ const translations: Record<Lang, Record<string, string>> = {
     // Tabs
     'tab.search': '搜索',
     'tab.downloads': '下载',
+    'tab.downloadActivity': '下载（{active} 项进行中，{queued} 项等待中）',
     'tab.settings': '设置',
 
     // Login
@@ -169,17 +181,25 @@ const translations: Record<Lang, Record<string, string>> = {
     'dl.empty': '还没有下载任务',
     'dl.emptyHint': '搜索音乐或粘贴链接开始下载',
     'dl.downloading': '下载中 — {n} 项',
+    'dl.verifying': '正在验证文件…',
+    'dl.retrying': '正在以原音质重试…',
+    'dl.retryingCd': '正在以 CD 音质补下载…',
+    'dl.cdFallback': '{track} · 已用 CD 音质下载（FLAC 16-bit / 44.1 kHz）',
     'dl.queued': '等待中',
     'dl.failed': '失败',
     'dl.errorDetails': '查看错误详情',
     'dl.completed': '已完成',
     'dl.retry': '↻ 重试',
+    'dl.retryError': '无法重试这个下载任务。',
+    'dl.alreadyQueued': '此任务已在下载或排队。',
     'dl.clearCompleted': '✕ 清空',
     'dl.deleteFilesToo': '同时删除文件',
     'dl.pausedLabel': '⏸ 已暂停',
     'dl.pause': '⏸ 暂停',
     'dl.resume': '▶ 继续',
     'dl.delete': '✕ 删除',
+    'dl.deleteFailedHint': '移除失败任务并删除其不完整文件',
+    'dl.deleteFailedError': '无法删除失败任务。请关闭占用文件的应用后重试。',
 
     // Settings
     'set.general': '通用',
@@ -216,6 +236,8 @@ const translations: Record<Lang, Record<string, string>> = {
 
     // Search result card
     'card.download': '下载',
+    'card.adding': '正在加入…',
+    'card.added': '✓ 已加入',
     'card.view': '查看 ▾',
     'card.hide': '收起 ▴',
   },

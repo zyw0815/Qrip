@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import QualityBadge from './QualityBadge'
 import { useI18n } from '../i18n'
 
@@ -11,11 +10,12 @@ export interface ResultProps {
   qualityTags: string[]
   selected?: boolean
   added?: boolean
+  adding?: boolean
   expanded?: boolean
-  tracks?: { id: string; title: string; artist: string; added: boolean }[]
-  onDownload: () => void
+  tracks?: { id: string; title: string; artist: string; added: boolean; adding: boolean }[]
+  onDownload: (origin: DOMRect) => void
   onView?: () => void
-  onTrackDownload?: (trackId: string) => void
+  onTrackDownload?: (trackId: string, origin: DOMRect) => void
 }
 
 const typeBadge: Record<string, string> = {
@@ -85,12 +85,12 @@ export default function SearchResultCard(p: ResultProps) {
           )}
 
           <div className="flex gap-2">
-            {/* All types get a Download button — stays purple */}
             <button
-              onClick={p.onDownload}
-              className="h-[38px] px-4 bg-purple text-white rounded-md text-sm font-medium hover:bg-[#6d28d9] transition"
+              onClick={(event) => p.onDownload(event.currentTarget.getBoundingClientRect())}
+              disabled={p.added || p.adding}
+              className="h-[38px] px-4 bg-purple text-white rounded-md text-sm font-medium hover:bg-[#6d28d9] transition disabled:opacity-70"
             >
-              {t('card.download')}
+              {t(p.adding ? 'card.adding' : p.added ? 'card.added' : 'card.download')}
             </button>
             {(p.type === 'album' || p.type === 'playlist') && p.onView && (
               <button
@@ -118,10 +118,11 @@ export default function SearchResultCard(p: ResultProps) {
                 <div className="text-[13px] text-text-muted truncate">{track.artist}</div>
               </div>
               <button
-                onClick={() => p.onTrackDownload?.(track.id)}
-                className="h-[24px] px-3 bg-purple text-white rounded text-[13px] hover:bg-[#6d28d9] transition flex-shrink-0"
+                onClick={(event) => p.onTrackDownload?.(track.id, event.currentTarget.getBoundingClientRect())}
+                disabled={track.added || track.adding}
+                className="h-[24px] px-3 bg-purple text-white rounded text-[13px] hover:bg-[#6d28d9] transition flex-shrink-0 disabled:opacity-70"
               >
-                {t('card.download')}
+                {t(track.adding ? 'card.adding' : track.added ? 'card.added' : 'card.download')}
               </button>
             </div>
           ))}
