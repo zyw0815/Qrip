@@ -53,13 +53,14 @@ export default function MainLayout() {
     }, () => icon.remove())
   }, [refreshDownloads])
 
+  const downloadCount = activity.active + activity.queued
   const TABS: Tab[] = [
     { key: 'search', label: t('tab.search') },
     {
       key: 'downloads',
       label: t('tab.downloads'),
-      badge: activity.active > 0 ? activity.active : undefined,
-      description: activity.active || activity.queued
+      badge: downloadCount > 0 ? downloadCount : undefined,
+      description: downloadCount > 0
         ? t('tab.downloadActivity', { active: activity.active, queued: activity.queued })
         : undefined,
       buttonRef: downloadsButton,
